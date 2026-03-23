@@ -49,6 +49,24 @@ services:
       KAFKA_CLUSTERS_0_NAME: aferent-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: auth-service
+    networks: [aferent-network]
+    ports:
+      - "3001:3001"   # exposed for direct testing — remove in production
+    environment:
+      MONGO_URI: ${MONGO_URI_AUTH_SERVICE}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./logs/auth-service:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -56,8 +74,12 @@ services:
     networks: [aferent-network]
     ports:
       - "8080:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:3001
     volumes:
       - ./logs/api-gateway:/app/logs
 
