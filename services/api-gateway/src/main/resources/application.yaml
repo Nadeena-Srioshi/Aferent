@@ -53,10 +53,10 @@ spring:
             - Path=/notifications/**
 
         # AI SERVICE
-        - id: ai-service
-          uri: http://ai-service:3008
+        - id: symptom-detector
+          uri: http://symptom-detector:3008
           predicates:
-            - Path=/symptom-check/**, /prompts/**
+            - Path=/ai/**
 
 app:
   jwt:
