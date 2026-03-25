@@ -14,7 +14,6 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.logging import get_logger
 from app.db.prompt_repository import PromptRepository
-from app.models.enums import MedicalCategory
 from app.models.prompt import PromptDocument
 from app.schemas.common import PaginatedResponse
 from app.schemas.prompt import (
@@ -29,12 +28,12 @@ logger = get_logger(__name__)
 
 def _to_response(doc: PromptDocument) -> PromptResponse:
     return PromptResponse(
-        category=doc.category,
+        specialization=doc.specialization,
         version=doc.version,
-        active=doc.active,
-        system_prompt=doc.system_prompt,
-        user_template=doc.user_template,
-        metadata=doc.metadata,
+        is_active=doc.is_active,
+        system_instruction=doc.system_instruction,
+        author=doc.author,
+        updated_by=doc.updated_by,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
     )
@@ -42,11 +41,13 @@ def _to_response(doc: PromptDocument) -> PromptResponse:
 
 def _to_summary(doc: PromptDocument) -> PromptVersionSummary:
     return PromptVersionSummary(
-        category=doc.category,
+        specialization=doc.specialization,
         version=doc.version,
-        active=doc.active,
+        is_active=doc.is_active,
+        author=doc.author,
+        updated_by=doc.updated_by,
+        created_at=doc.created_at,
         updated_at=doc.updated_at,
-        metadata=doc.metadata,
     )
 
 
@@ -56,13 +57,11 @@ class PromptService:
 
     async def list_prompts(
         self,
-        category: MedicalCategory | None,
+        specialization: str | None,
         page: int,
         page_size: int,
     ) -> PaginatedResponse[PromptVersionSummary]:
-        docs, total = await self._repo.list_all(
-            category, page=page, page_size=page_size
-        )
+        docs, total = await self._repo.list_all(specialization, page=page, page_size=page_size)
         return PaginatedResponse(
             items=[_to_summary(d) for d in docs],
             total=total,
@@ -71,13 +70,13 @@ class PromptService:
         )
 
     async def get_prompt(
-        self, category: MedicalCategory, version: int
+        self, specialization: str, version: str
     ) -> PromptResponse:
-        doc = await self._repo.get_by_version(category, version)
+        doc = await self._repo.get_by_version(specialization, version)
         return _to_response(doc)
 
-    async def get_active_prompt(self, category: MedicalCategory) -> PromptResponse:
-        doc = await self._repo.get_active_prompt(category)
+    async def get_active_prompt(self, specialization: str) -> PromptResponse:
+        doc = await self._repo.get_active_prompt(specialization)
         return _to_response(doc)
 
     async def create_prompt(self, req: PromptCreateRequest) -> PromptResponse:
@@ -86,23 +85,23 @@ class PromptService:
 
     async def update_prompt(
         self,
-        category: MedicalCategory,
-        version: int,
+        specialization: str,
+        version: str,
         req: PromptUpdateRequest,
     ) -> PromptResponse:
-        doc = await self._repo.update(category, version, req)
+        doc = await self._repo.update(specialization, version, req)
         return _to_response(doc)
 
     async def activate_prompt(
-        self, category: MedicalCategory, version: int, *, active: bool
+        self, specialization: str, version: str, *, active: bool, updated_by: str
     ) -> PromptResponse:
-        doc = await self._repo.set_active(category, version, active=active)
+        doc = await self._repo.set_active(specialization, version, active=active, updated_by=updated_by)
         return _to_response(doc)
 
     async def delete_prompt(
-        self, category: MedicalCategory, version: int
+        self, specialization: str, version: str
     ) -> None:
-        await self._repo.delete(category, version)
+        await self._repo.delete(specialization, version)
 
     async def seed_defaults(self) -> list[PromptResponse]:
         """
@@ -112,32 +111,33 @@ class PromptService:
         """
         created: list[PromptResponse] = []
 
+        from app.models.enums import MedicalCategory
+
         for category in MedicalCategory:
-            versions = await self._repo.list_versions(category)
+            specialization = " ".join(category.value.replace("_", " ").split()).title()
+            versions = await self._repo.list_versions(specialization)
             if versions:
-                logger.debug("prompt_service.seed_skip", category=category.value)
+                logger.debug("prompt_service.seed_skip", specialization=specialization)
                 continue
 
             req = PromptCreateRequest(
-                category=category,
-                system_prompt=(
-                    f"You are an expert {category.value.replace('_', ' ')} triage assistant.\n"
+                specialization=specialization,
+                version="1.0.0",
+                system_instruction=(
+                    f"You are a specialized {specialization} triage assistant.\n"
                     "Analyse the patient's symptoms and return a JSON object with these exact fields:\n"
                     "- confidence_score: float 0.0–1.0\n"
                     "- suggestions: array of 3–5 actionable clinical suggestions\n"
                     "- reasoning: brief explanation\n"
                     "Return ONLY valid JSON. No markdown, no preamble."
                 ),
-                user_template=(
-                    "Patient symptoms: {symptoms}\n\n"
-                    "Respond with a JSON object: confidence_score, suggestions (array), reasoning."
-                ),
-                metadata={"author": "system_seed", "seeded": True},
+                author="system_seed",
+                updated_by="system_seed",
             )
             doc = await self._repo.create(req)
             # Auto-activate the very first version for each category
-            doc = await self._repo.set_active(category, doc.version, active=True)
+            doc = await self._repo.set_active(specialization, doc.version, active=True, updated_by="system_seed")
             created.append(_to_response(doc))
-            logger.info("prompt_service.seeded", category=category.value, version=doc.version)
+            logger.info("prompt_service.seeded", specialization=specialization, version=doc.version)
 
         return created

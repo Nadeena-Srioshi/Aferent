@@ -1,7 +1,7 @@
 """
 app/api/v1/endpoints/symptoms.py
 ──────────────────────────────────
-POST /api/v1/symptoms -  analyse a symptom description.
+POST /ai/api/v1/symptoms - analyse a symptom description.
 
 Route files are intentionally thin:
   - validate input  (Pydantic, automatic)

@@ -1,7 +1,7 @@
 """
 app/api/v1/endpoints/health.py
 ────────────────────────────────
-GET /api/v1/health - liveness + readiness probe.
+GET /ai/api/v1/health - liveness + readiness probe.
 Used by Docker healthcheck and load balancers.
 """
 

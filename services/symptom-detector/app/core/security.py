@@ -1,41 +1,36 @@
 """
 app/core/security.py
 ─────────────────────
-HTTP security dependencies for the admin API.
+HTTP security dependencies for gateway-forwarded role checks.
 
-Phase 1: static API key via X-Admin-API-Key header.
-Phase 2: swap `verify_admin_key` for JWT / OAuth2 without changing any route.
-
-Usage in a route:
-    @router.post("/prompts", dependencies=[Depends(verify_admin_key)])
-    async def create_prompt(...): ...
+All prompt management routes currently require `ADMIN`.
 """
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Security, status
-from fastapi.security import APIKeyHeader
+from fastapi import Header, HTTPException, status
 
 from app.core.config import get_settings
 
-_API_KEY_HEADER = APIKeyHeader(
-    name="X-Admin-API-Key",
-    description="Static admin API key. Set ADMIN_API_KEY in your .env file.",
-    auto_error=True,          # raises 403 automatically if header is absent
-)
-
-
-async def verify_admin_key(
-    api_key: str = Security(_API_KEY_HEADER),
+async def require_admin_role(
+    x_user_role: str | None = Header(default=None, alias="X-User-Role"),
 ) -> None:
-    """
-    FastAPI dependency that validates the X-Admin-API-Key header.
-    Raises HTTP 401 on mismatch so clients know they're unauthorised,
-    not merely forbidden from a resource they know exists.
-    """
+    """Allow only requests whose forwarded role is ADMIN."""
     settings = get_settings()
-    if api_key != settings.admin_api_key:
+    if x_user_role is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid admin API key.",
+            detail="Missing X-User-Role header.",
         )
+
+    if x_user_role.strip().upper() != settings.admin_role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges are required.",
+        )
+
+
+async def verify_admin_key(*args, **kwargs) -> None:  # pragma: no cover - compatibility shim
+    """Backward-compatible shim for older imports."""
+    return await require_admin_role(*args, **kwargs)
+

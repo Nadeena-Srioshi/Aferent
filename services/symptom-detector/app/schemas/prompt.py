@@ -1,74 +1,83 @@
 """
 app/schemas/prompt.py
 ──────────────────────
-Pydantic schemas for the admin prompt management API.
-Decoupled from the internal PromptDocument model so the API surface
-can evolve independently of the DB schema.
+Pydantic schemas for specialization prompt management.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import MedicalCategory
+
+_SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 # ── Create ─────────────────────────────────────────────────────────────────────
 
 class PromptCreateRequest(BaseModel):
-    """Body for POST /api/v1/admin/prompts"""
+    """Body for POST /api/v1/prompts"""
 
-    category: MedicalCategory
-    system_prompt: str = Field(
+    specialization: str = Field(..., min_length=2)
+    version: str = Field(..., min_length=5)
+    system_instruction: str = Field(
         ...,
         min_length=20,
         description="System-level instruction sent to the LLM.",
         examples=["You are an expert cardiology triage assistant. Return ONLY valid JSON."],
     )
-    user_template: str = Field(
-        ...,
-        min_length=10,
-        description="User message template. Must contain the literal string {symptoms}.",
-        examples=["Patient symptoms: {symptoms}\n\nRespond with confidence_score, suggestions, reasoning."],
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Arbitrary key-value metadata (author, reviewer, ticket ref, etc.)",
-    )
+    author: str = Field(..., min_length=1)
+    updated_by: str | None = Field(default=None)
 
-    @field_validator("user_template")
+    @field_validator("specialization")
     @classmethod
-    def must_contain_symptoms_placeholder(cls, v: str) -> str:
-        if "{symptoms}" not in v:
-            raise ValueError("user_template must contain the '{symptoms}' placeholder.")
-        return v
+    def normalize_specialization(cls, value: str) -> str:
+        cleaned = " ".join(value.strip().replace("_", " ").split())
+        if not cleaned:
+            raise ValueError("specialization cannot be empty.")
+        return cleaned.title()
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        version = value.strip()
+        if not _SEMVER_PATTERN.fullmatch(version):
+            raise ValueError("version must be a semantic version like '1.0.4'.")
+        return version
+
+    @field_validator("system_instruction")
+    @classmethod
+    def validate_system_instruction(cls, value: str) -> str:
+        instruction = value.strip()
+        if len(instruction) < 20:
+            raise ValueError("system_instruction must be at least 20 characters long.")
+        return instruction
 
 
 # ── Update ─────────────────────────────────────────────────────────────────────
 
 class PromptUpdateRequest(BaseModel):
-    """Body for PATCH /api/v1/admin/prompts/{category}/versions/{version}"""
+    """Body for PATCH /api/v1/prompts/{specialization}/versions/{version}"""
 
-    system_prompt: str | None = Field(default=None, min_length=20)
-    user_template: str | None = Field(default=None, min_length=10)
-    metadata: dict[str, Any] | None = None
+    system_instruction: str | None = Field(default=None, min_length=20)
+    updated_by: str = Field(..., min_length=1)
 
-    @field_validator("user_template")
+    @field_validator("system_instruction")
     @classmethod
-    def must_contain_symptoms_placeholder(cls, v: str | None) -> str | None:
-        if v is not None and "{symptoms}" not in v:
-            raise ValueError("user_template must contain the '{symptoms}' placeholder.")
-        return v
+    def validate_system_instruction(cls, value: str | None) -> str | None:
+        if value is not None and len(value.strip()) < 20:
+            raise ValueError("system_instruction must be at least 20 characters long.")
+        return value
 
 
 # ── Activate / Deactivate ──────────────────────────────────────────────────────
 
 class PromptActivateRequest(BaseModel):
-    """Body for POST /api/v1/admin/prompts/{category}/versions/{version}/activate"""
-    active: bool = Field(..., description="Set to true to activate, false to deactivate.")
+    """Body for POST /api/v1/prompts/{specialization}/versions/{version}/activate"""
+    is_active: bool = Field(..., description="Set to true to activate, false to deactivate.")
+    updated_by: str = Field(..., min_length=1)
 
 
 # ── Response ───────────────────────────────────────────────────────────────────
@@ -76,12 +85,12 @@ class PromptActivateRequest(BaseModel):
 class PromptResponse(BaseModel):
     """Returned for all prompt read/write operations."""
 
-    category: MedicalCategory
-    version: int
-    active: bool
-    system_prompt: str
-    user_template: str
-    metadata: dict[str, Any]
+    specialization: str
+    version: str
+    is_active: bool
+    system_instruction: str
+    author: str
+    updated_by: str
     created_at: datetime
     updated_at: datetime
 
@@ -89,8 +98,10 @@ class PromptResponse(BaseModel):
 class PromptVersionSummary(BaseModel):
     """Lightweight item for list endpoints."""
 
-    category: MedicalCategory
-    version: int
-    active: bool
+    specialization: str
+    version: str
+    is_active: bool
+    author: str
+    updated_by: str
+    created_at: datetime
     updated_at: datetime
-    metadata: dict[str, Any]

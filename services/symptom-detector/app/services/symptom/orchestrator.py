@@ -72,7 +72,8 @@ class SymptomOrchestrator:
         # })
 
         # ── Step 2: Fetch versioned prompt ────────────────────────────────────
-        prompt = await self._prompt_repo.get_active_prompt(classification.category)
+        specialization = " ".join(classification.category.value.replace("_", " ").split()).title()
+        prompt = await self._prompt_repo.get_active_prompt(specialization)
 
         # ── Step 3: Execute LLM ───────────────────────────────────────────────
         # NOTE (Phase 2 – LangGraph):
