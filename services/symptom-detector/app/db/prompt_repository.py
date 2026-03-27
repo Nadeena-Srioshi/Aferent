@@ -49,7 +49,7 @@ class PromptRepository:
     async def get_active_prompt(self, specialization: str) -> PromptDocument:
         """Return the active prompt with the highest semantic version."""
         specialization = self._canonical_specialization(specialization)
-        logger.debug("prompt_repository.fetch_active", specialization=specialization)
+        logger.debug("prompt_repository.fetch_active specialization=%s", specialization)
         try:
             docs = await self._col.find(
                 {"specialization": specialization, "is_active": True},
@@ -66,9 +66,9 @@ class PromptRepository:
         doc = max(docs, key=lambda item: self._semver_key(item["version"]))
         prompt = PromptDocument.model_validate(doc)
         logger.info(
-            "prompt_repository.active_found",
-            specialization=specialization,
-            version=prompt.version,
+            "prompt_repository.active_found specialization=%s version=%s",
+            specialization,
+            prompt.version,
         )
         return prompt
 
@@ -149,9 +149,9 @@ class PromptRepository:
             raise DatabaseError(f"Failed to create prompt: {exc}") from exc
 
         logger.info(
-            "prompt_repository.created",
-            specialization=specialization,
-            version=req.version,
+            "prompt_repository.created specialization=%s version=%s",
+            specialization,
+            req.version,
         )
         return doc
 
@@ -181,7 +181,7 @@ class PromptRepository:
             raise PromptNotFoundError(
                 f"Prompt '{specialization}' version {version} not found."
             )
-        logger.info("prompt_repository.updated", specialization=specialization, version=version)
+        logger.info("prompt_repository.updated specialization=%s version=%s", specialization, version)
         return PromptDocument.model_validate(updated)
 
     async def set_active(
@@ -219,10 +219,10 @@ class PromptRepository:
             raise DatabaseError(f"Failed to set active state: {exc}") from exc
 
         logger.info(
-            "prompt_repository.activation_changed",
-            specialization=specialization,
-            version=version,
-            is_active=active,
+            "prompt_repository.activation_changed specialization=%s version=%s is_active=%s",
+            specialization,
+            version,
+            active,
         )
         return PromptDocument.model_validate(updated)
 
@@ -247,4 +247,4 @@ class PromptRepository:
             raise PromptNotFoundError(
                 f"Prompt '{specialization}' version {version} not found."
             )
-        logger.info("prompt_repository.deleted", specialization=specialization, version=version)
+        logger.info("prompt_repository.deleted specialization=%s version=%s", specialization, version)

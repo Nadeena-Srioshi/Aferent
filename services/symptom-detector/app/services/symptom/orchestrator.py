@@ -32,6 +32,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.logging import get_logger
 from app.db.prompt_repository import PromptRepository
+from app.db.result_repository import ResultRepository
+from app.db.triage_analytics_repository import TriageAnalyticsRepository
 from app.schemas.symptom import SymptomRequest, SymptomResponse
 from app.services.llm.executor import LLMExecutor
 from app.services.symptom.category_router import CategoryRouter
@@ -48,6 +50,8 @@ class SymptomOrchestrator:
 
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self._prompt_repo = PromptRepository(db)
+        self._result_repo = ResultRepository(db)
+        self._analytics_repo = TriageAnalyticsRepository(db)
         self._router = CategoryRouter()
         self._executor = LLMExecutor()
 
@@ -55,10 +59,10 @@ class SymptomOrchestrator:
         request_id = str(uuid.uuid4())
 
         logger.info(
-            "orchestrator.start",
-            request_id=request_id,
-            patient_id=request.patient_id,
-            symptoms_length=len(request.symptoms),
+            "orchestrator.start request_id=%s patient_id=%s symptoms_length=%s",
+            request_id,
+            request.patient_id,
+            len(request.symptoms),
         )
 
         # ── Step 1: Classify ──────────────────────────────────────────────────
@@ -91,12 +95,18 @@ class SymptomOrchestrator:
             request_id=request_id,
         )
 
-        # NOTE (Phase 2 – Persistence):
-        # await result_repo.save(response)
+        # ── Step 5: Persist response + analytics ────────────────────────────
+        await self._result_repo.save(response, prompt_version=prompt.version)
+        await self._analytics_repo.record_hit(
+            specialization=specialization,
+            version=prompt.version,
+            confidence_score=response.confidence_score,
+            confidence_tier=response.confidence_tier,
+        )
 
         logger.info(
-            "orchestrator.complete",
-            request_id=request_id,
-            tier=response.confidence_tier.value,
+            "orchestrator.complete request_id=%s tier=%s",
+            request_id,
+            response.confidence_tier.value,
         )
         return response

@@ -45,3 +45,10 @@ class SymptomResponse:
     escalate_to_human: bool = False
     workflow_metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass(slots=True)
+class HealthResponse:
+    status: str
+    version: str
+    environment: str

@@ -72,12 +72,12 @@ def handle_response(
         escalate_to_human = True
 
     logger.info(
-        "response_handler.tier_assigned",
-        request_id=rid,
-        tier=tier.value,
-        confidence_score=analysis.confidence_score,
-        verification_required=verification_required,
-        escalate_to_human=escalate_to_human,
+        "response_handler.tier_assigned request_id=%s tier=%s confidence_score=%.4f verification_required=%s escalate_to_human=%s",
+        rid,
+        tier.value,
+        analysis.confidence_score,
+        verification_required,
+        escalate_to_human,
     )
 
     return SymptomResponse(

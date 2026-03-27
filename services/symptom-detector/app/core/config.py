@@ -25,6 +25,9 @@ class Settings:
     user_role_header: str = getenv("USER_ROLE_HEADER", "X-User-Role")
     user_id_header: str = getenv("USER_ID_HEADER", "X-User-Id")
     admin_role: str = getenv("ADMIN_ROLE", "ADMIN")
+    gemini_api_key: str | None = getenv("GEMINI_API_KEY")
+    gemini_model: str = getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    gemini_timeout_seconds: float = float(getenv("GEMINI_TIMEOUT_SECONDS", "30"))
 
     @property
     def is_production(self) -> bool:

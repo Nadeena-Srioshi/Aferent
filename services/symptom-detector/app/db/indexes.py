@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 PROMPTS_COLLECTION = "specialization_prompts"
 RESULTS_COLLECTION = "symptom_results"
+TRIAGE_ANALYTICS_COLLECTION = "triage_analytics"
 
 
 async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
@@ -38,4 +39,15 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
         "created_at",
         name="ttl_results_created_at",
         expireAfterSeconds=60 * 60 * 24 * 90,
+    )
+
+    analytics = db[TRIAGE_ANALYTICS_COLLECTION]
+    await analytics.create_index(
+        [("specialization", 1), ("version", 1)],
+        name="uniq_analytics_specialization_version",
+        unique=True,
+    )
+    await analytics.create_index(
+        [("specialization", 1), ("updated_at", -1)],
+        name="idx_analytics_specialization_updated_at",
     )

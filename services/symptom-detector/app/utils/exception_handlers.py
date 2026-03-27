@@ -33,7 +33,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def classification_error_handler(
         request: Request, exc: CategoryClassificationError
     ) -> JSONResponse:
-        logger.warning("http.classification_error", detail=str(exc))
+        logger.warning("http.classification_error detail=%s", str(exc))
         return JSONResponse(
             status_code=422,
             content=_error_body("CLASSIFICATION_FAILED", str(exc)),
@@ -43,7 +43,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def prompt_not_found_handler(
         request: Request, exc: PromptNotFoundError
     ) -> JSONResponse:
-        logger.error("http.prompt_not_found", detail=str(exc))
+        logger.error("http.prompt_not_found detail=%s", str(exc))
         return JSONResponse(
             status_code=404,
             content=_error_body("PROMPT_NOT_FOUND", str(exc)),
@@ -53,7 +53,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def llm_parse_error_handler(
         request: Request, exc: LLMResponseParseError
     ) -> JSONResponse:
-        logger.error("http.llm_parse_error", detail=str(exc))
+        logger.error("http.llm_parse_error detail=%s", str(exc))
         return JSONResponse(
             status_code=502,
             content=_error_body("LLM_PARSE_ERROR", str(exc)),
@@ -63,7 +63,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def llm_exec_error_handler(
         request: Request, exc: LLMExecutionError
     ) -> JSONResponse:
-        logger.error("http.llm_execution_error", detail=str(exc))
+        logger.error("http.llm_execution_error detail=%s", str(exc))
         return JSONResponse(
             status_code=502,
             content=_error_body("LLM_EXECUTION_ERROR", str(exc)),
@@ -73,7 +73,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def database_error_handler(
         request: Request, exc: DatabaseError
     ) -> JSONResponse:
-        logger.error("http.database_error", detail=str(exc))
+        logger.error("http.database_error detail=%s", str(exc))
         return JSONResponse(
             status_code=503,
             content=_error_body("DATABASE_ERROR", str(exc)),
@@ -83,7 +83,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def generic_service_error_handler(
         request: Request, exc: SymptomServiceError
     ) -> JSONResponse:
-        logger.error("http.service_error", detail=str(exc))
+        logger.error("http.service_error detail=%s", str(exc))
         return JSONResponse(
             status_code=500,
             content=_error_body("SERVICE_ERROR", str(exc)),

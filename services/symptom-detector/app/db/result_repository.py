@@ -31,7 +31,7 @@ class ResultRepository:
     async def save(
         self,
         response: SymptomResponse,
-        prompt_version: int = 1,
+        prompt_version: str = "1.0.0",
     ) -> ResultDocument:
         """
         Persist a completed SymptomResponse to Atlas.
@@ -66,9 +66,9 @@ class ResultRepository:
             raise DatabaseError(f"Failed to save result: {exc}") from exc
 
         logger.info(
-            "result_repository.saved",
-            request_id=doc.request_id,
-            tier=doc.confidence_tier.value,
+            "result_repository.saved request_id=%s tier=%s",
+            doc.request_id,
+            doc.confidence_tier.value,
         )
         return doc
 

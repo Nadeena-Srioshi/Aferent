@@ -117,7 +117,7 @@ class PromptService:
             specialization = " ".join(category.value.replace("_", " ").split()).title()
             versions = await self._repo.list_versions(specialization)
             if versions:
-                logger.debug("prompt_service.seed_skip", specialization=specialization)
+                logger.debug("prompt_service.seed_skip specialization=%s", specialization)
                 continue
 
             req = PromptCreateRequest(
@@ -138,6 +138,6 @@ class PromptService:
             # Auto-activate the very first version for each category
             doc = await self._repo.set_active(specialization, doc.version, active=True, updated_by="system_seed")
             created.append(_to_response(doc))
-            logger.info("prompt_service.seeded", specialization=specialization, version=doc.version)
+            logger.info("prompt_service.seeded specialization=%s version=%s", specialization, doc.version)
 
         return created

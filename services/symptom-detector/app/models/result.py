@@ -35,7 +35,7 @@ class ResultDocument(BaseModel):
             "reasoning":            "...",
             "verification_required": false,
             "escalate_to_human":    false,
-            "prompt_version":       1,
+            "prompt_version":       "1.0.4",
             "workflow_metadata":    {},
             "created_at":           ISODate("...")
         }
@@ -50,7 +50,7 @@ class ResultDocument(BaseModel):
     reasoning: str
     verification_required: bool = False
     escalate_to_human: bool = False
-    prompt_version: int = 1
+    prompt_version: str = "1.0.0"
     workflow_metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
