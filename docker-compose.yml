@@ -83,6 +83,43 @@ services:
     volumes:
       - ./logs/api-gateway:/app/logs
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    networks: [aferent-network]
+    ports:
+      - "9000:9000"    # API port — presigned URLs point here
+      - "9001:9001"    # MinIO web console — visit localhost:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  patient-service:
+    build:
+      context: ./services/patient-service
+    container_name: patient-service
+    networks: [aferent-network]
+    ports:
+      - "3002:3002"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      MONGO_URI: ${MONGO_URI_PATIENT_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: patient-documents
+
 networks:
   aferent-network:
     driver: bridge
@@ -90,3 +127,4 @@ networks:
 volumes:
   mongo-data:
   kafka-data:
+  minio-data:
