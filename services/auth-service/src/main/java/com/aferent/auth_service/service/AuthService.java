@@ -7,19 +7,25 @@ import com.aferent.auth_service.dto.RegisterRequest;
 import com.aferent.auth_service.model.User;
 import com.aferent.auth_service.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final KafkaTemplate<String, Map<String, Object>> kafkaTemplate;
 
     public AuthResponse register(RegisterRequest request) {
+                log.info("Processing register request for email={}, role={}", request.getEmail(), request.getRole());
 
         // Check email not already taken
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -36,6 +42,15 @@ public class AuthService {
         // Save to MongoDB
         User saved = userRepository.save(user);
 
+        // Publish user.registered event to Kafka
+        // patient-service and doctor-service services listen to this event
+        Map<String, Object> event = new HashMap<>();
+        event.put("authId", saved.getId());
+        event.put("email", saved.getEmail());
+        event.put("role", saved.getRole().name());
+        kafkaTemplate.send("user.registered", saved.getId(), event);
+        log.info("Published user.registered event for authId={}, role={}", saved.getId(), saved.getRole().name());
+
         //  Generate tokens
         String accessToken = jwtUtil.generateAccessToken(
                 saved.getId(), saved.getEmail(), saved.getRole().name()
@@ -43,8 +58,9 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
+                .tokenType("Bearer")
                 .role(saved.getRole().name())
-                .userId(saved.getId())
+                .authId(saved.getId())
                 .build();
     }
 
@@ -71,7 +87,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .role(user.getRole().name())
-                .userId(user.getId())
+                .authId(user.getId())
                 .tokenType("Bearer")
                 .build();
     }
