@@ -10,7 +10,7 @@ Public surface:
 Versioning rules:
   * Each (specialization, version) pair is unique (enforced by DB index).
   * Only ONE document per specialization may have is_active=True at a time.
-  * Versions are semantic strings (e.g. 1.0.4).
+    * Versions are semantic strings (e.g. v1.0.4).
   * `activate` deactivates all other versions for the same specialization atomically.
 """
 
@@ -41,7 +41,7 @@ class PromptRepository:
 
     @staticmethod
     def _semver_key(version: str) -> tuple[int, int, int, str]:
-        match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", version.strip())
+        match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", version.strip())
         if match is None:
             return (0, 0, 0, version)
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)), version)
@@ -126,19 +126,27 @@ class PromptRepository:
             raise DatabaseError(f"Failed to list versions: {exc}") from exc
         return [d["version"] for d in sorted(docs, key=lambda item: self._semver_key(item["version"]))]
 
-    async def create(self, req: PromptCreateRequest) -> PromptDocument:
+    async def create(
+        self,
+        req: PromptCreateRequest,
+        *,
+        actor_id: str,
+        version: str,
+    ) -> PromptDocument:
         """Insert a new semantic version for a specialization."""
         specialization = self._canonical_specialization(req.specialization)
-        updated_by = req.updated_by or req.author
+        actor_id = actor_id.strip()
+        if not actor_id:
+            raise DatabaseError("Caller identity is required to create prompt versions.")
 
         now = datetime.utcnow()
         doc = PromptDocument(
             specialization=specialization,
-            version=req.version,
+            version=version,
             is_active=False,
             system_instruction=req.system_instruction,
-            author=req.author,
-            updated_by=updated_by,
+            author=actor_id,
+            updated_by=actor_id,
             created_at=now,
             updated_at=now,
         )
@@ -151,7 +159,7 @@ class PromptRepository:
         logger.info(
             "prompt_repository.created specialization=%s version=%s",
             specialization,
-            req.version,
+            version,
         )
         return doc
 
@@ -159,11 +167,17 @@ class PromptRepository:
         self,
         specialization: str,
         version: str,
+        *,
+        updated_by: str,
         req: PromptUpdateRequest,
     ) -> PromptDocument:
         """Patch mutable fields of an existing prompt version."""
         specialization = self._canonical_specialization(specialization)
-        updates: dict = {"updated_at": datetime.utcnow(), "updated_by": req.updated_by}
+        updated_by = updated_by.strip()
+        if not updated_by:
+            raise DatabaseError("Caller identity is required to update prompt versions.")
+
+        updates: dict = {"updated_at": datetime.utcnow(), "updated_by": updated_by}
         if req.system_instruction is not None:
             updates["system_instruction"] = req.system_instruction
 

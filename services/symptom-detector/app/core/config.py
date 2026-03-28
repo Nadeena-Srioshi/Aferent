@@ -13,6 +13,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from os import getenv
+from urllib.parse import urlparse
+
+
+def _mongo_db_from_uri(mongo_uri: str) -> str:
+    parsed = urlparse(mongo_uri)
+    database = parsed.path.lstrip("/")
+    if not database:
+        raise ValueError("MONGO_URI must include a database name, e.g. mongodb://host/dbname")
+    return database
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,9 +30,9 @@ class Settings:
     app_version: str = getenv("APP_VERSION", "0.1.0")
     app_env: str = getenv("APP_ENV", "development")
     mongo_uri: str = getenv("MONGO_URI", "mongodb://localhost:27017")
-    mongo_db_name: str = getenv("MONGO_DB_NAME", "aferent")
+    mongo_db_name: str = _mongo_db_from_uri(getenv("MONGO_URI", "mongodb://localhost:27017"))
     user_role_header: str = getenv("USER_ROLE_HEADER", "X-User-Role")
-    user_id_header: str = getenv("USER_ID_HEADER", "X-User-Id")
+    user_id_header: str = getenv("USER_ID_HEADER", "X-User-ID")
     admin_role: str = getenv("ADMIN_ROLE", "ADMIN")
     gemini_api_key: str | None = getenv("GEMINI_API_KEY")
     gemini_model: str = getenv("GEMINI_MODEL", "gemini-1.5-flash")

@@ -10,6 +10,8 @@ repository (DB concerns) and the routes (HTTP concerns).
 
 from __future__ import annotations
 
+import re
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.logging import get_logger
@@ -24,6 +26,26 @@ from app.schemas.prompt import (
 )
 
 logger = get_logger(__name__)
+
+_SEMVER_WITH_OPTIONAL_V = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+
+def _next_patch_version(versions: list[str]) -> str:
+    latest: tuple[int, int, int] | None = None
+
+    for version in versions:
+        match = _SEMVER_WITH_OPTIONAL_V.fullmatch(version.strip())
+        if not match:
+            continue
+        candidate = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        if latest is None or candidate > latest:
+            latest = candidate
+
+    if latest is None:
+        return "v1.0.0"
+
+    major, minor, patch = latest
+    return f"v{major}.{minor}.{patch + 1}"
 
 
 def _to_response(doc: PromptDocument) -> PromptResponse:
@@ -79,17 +101,21 @@ class PromptService:
         doc = await self._repo.get_active_prompt(specialization)
         return _to_response(doc)
 
-    async def create_prompt(self, req: PromptCreateRequest) -> PromptResponse:
-        doc = await self._repo.create(req)
+    async def create_prompt(self, req: PromptCreateRequest, *, actor_id: str) -> PromptResponse:
+        versions = await self._repo.list_versions(req.specialization)
+        next_version = _next_patch_version(versions)
+        doc = await self._repo.create(req, actor_id=actor_id, version=next_version)
         return _to_response(doc)
 
     async def update_prompt(
         self,
         specialization: str,
         version: str,
+        *,
+        updated_by: str,
         req: PromptUpdateRequest,
     ) -> PromptResponse:
-        doc = await self._repo.update(specialization, version, req)
+        doc = await self._repo.update(specialization, version, updated_by=updated_by, req=req)
         return _to_response(doc)
 
     async def activate_prompt(
@@ -103,13 +129,15 @@ class PromptService:
     ) -> None:
         await self._repo.delete(specialization, version)
 
-    async def seed_defaults(self) -> list[PromptResponse]:
+    async def seed_defaults(self, *, actor_id: str) -> list[PromptResponse]:
         """
         Insert v1 prompts for any category that has zero prompts.
         Idempotent — skips categories that already have at least one version.
         Useful for first-time Atlas setup or resetting a test database.
         """
         created: list[PromptResponse] = []
+
+        actor_id = actor_id.strip() or "system_seed"
 
         from app.models.enums import MedicalCategory
 
@@ -120,9 +148,10 @@ class PromptService:
                 logger.debug("prompt_service.seed_skip specialization=%s", specialization)
                 continue
 
+            next_version = _next_patch_version(versions)
+
             req = PromptCreateRequest(
                 specialization=specialization,
-                version="1.0.0",
                 system_instruction=(
                     f"You are a specialized {specialization} triage assistant.\n"
                     "Analyse the patient's symptoms and return a JSON object with these exact fields:\n"
@@ -131,12 +160,10 @@ class PromptService:
                     "- reasoning: brief explanation\n"
                     "Return ONLY valid JSON. No markdown, no preamble."
                 ),
-                author="system_seed",
-                updated_by="system_seed",
             )
-            doc = await self._repo.create(req)
+            doc = await self._repo.create(req, actor_id=actor_id, version=next_version)
             # Auto-activate the very first version for each category
-            doc = await self._repo.set_active(specialization, doc.version, active=True, updated_by="system_seed")
+            doc = await self._repo.set_active(specialization, doc.version, active=True, updated_by=actor_id)
             created.append(_to_response(doc))
             logger.info("prompt_service.seeded specialization=%s version=%s", specialization, doc.version)
 

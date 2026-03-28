@@ -9,7 +9,7 @@ All routes are ADMIN-only and expect the gateway to forward:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.security import require_admin_role
@@ -48,16 +48,18 @@ async def list_prompts(
 @router.post("", response_model=PromptResponse, status_code=status.HTTP_201_CREATED, summary="Create a specialization prompt version")
 async def create_prompt(
     body: PromptCreateRequest,
+    x_user_id: str = Header(..., alias="X-User-ID"),
     service: PromptService = Depends(_get_service),
 ) -> PromptResponse:
-    return await service.create_prompt(body)
+    return await service.create_prompt(body, actor_id=x_user_id)
 
 
 @router.post("/seed", response_model=list[PromptResponse], status_code=status.HTTP_201_CREATED, summary="Seed default specialization prompts")
 async def seed_prompts(
+    x_user_id: str = Header(..., alias="X-User-ID"),
     service: PromptService = Depends(_get_service),
 ) -> list[PromptResponse]:
-    return await service.seed_defaults()
+    return await service.seed_defaults(actor_id=x_user_id)
 
 
 @router.get("/{specialization}/active", response_model=PromptResponse, summary="Get the active prompt for a specialization")
@@ -92,9 +94,10 @@ async def update_prompt(
     specialization: str,
     version: str,
     body: PromptUpdateRequest,
+    x_user_id: str = Header(..., alias="X-User-ID"),
     service: PromptService = Depends(_get_service),
 ) -> PromptResponse:
-    return await service.update_prompt(specialization, version, body)
+    return await service.update_prompt(specialization, version, updated_by=x_user_id, req=body)
 
 
 @router.post("/{specialization}/versions/{version}/activate", response_model=PromptResponse, summary="Activate or deactivate a specialization prompt version")
@@ -102,13 +105,14 @@ async def activate_prompt(
     specialization: str,
     version: str,
     body: PromptActivateRequest,
+    x_user_id: str = Header(..., alias="X-User-ID"),
     service: PromptService = Depends(_get_service),
 ) -> PromptResponse:
     return await service.activate_prompt(
         specialization,
         version,
         active=body.is_active,
-        updated_by=body.updated_by,
+        updated_by=x_user_id,
     )
 
 

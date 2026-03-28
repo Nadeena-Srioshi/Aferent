@@ -34,10 +34,10 @@ async def lifespan(app: FastAPI):
     """Manage startup and graceful shutdown."""
     settings = get_settings()
     logger.info(
-        "app.starting",
-        name=settings.app_name,
-        version=settings.app_version,
-        env=settings.app_env,
+        "app.starting name=%s version=%s env=%s",
+        settings.app_name,
+        settings.app_version,
+        settings.app_env,
     )
 
     # ── Startup ───────────────────────────────────────────────────────────────

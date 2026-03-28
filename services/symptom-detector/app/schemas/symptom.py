@@ -35,12 +35,12 @@ class LLMAnalysisResult:
 @dataclass(slots=True)
 class SymptomResponse:
     request_id: str
-    patient_id: str | None = None
     category: MedicalCategory
     confidence_score: float
     confidence_tier: ConfidenceTier
     suggestions: list[str]
     reasoning: str
+    patient_id: str | None = None
     verification_required: bool = False
     escalate_to_human: bool = False
     workflow_metadata: dict[str, Any] = field(default_factory=dict)

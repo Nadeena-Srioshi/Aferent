@@ -188,7 +188,7 @@ All extension points are pre-marked with `NOTE (Phase 2 – ...)` comments.
   "version":        "1.0.4",
   "is_active":       true,
   "system_instruction": "You are a specialized Cardiologist...",
-  "author":         "admin_auth_id",
+  "author":         "admin_user_01",
   "updated_by":     "admin_user_01",
   "created_at":     "2026-04-14T00:00:00Z",
   "updated_at":     "2026-04-14T00:00:00Z"
