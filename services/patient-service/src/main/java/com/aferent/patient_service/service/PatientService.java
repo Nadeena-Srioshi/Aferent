@@ -1,6 +1,8 @@
 package com.aferent.patient_service.service;
 
 import com.aferent.patient_service.dto.*;
+import com.aferent.patient_service.exception.ForbiddenOperationException;
+import com.aferent.patient_service.exception.ResourceNotFoundException;
 import com.aferent.patient_service.model.Patient;
 import com.aferent.patient_service.model.PatientIdSequence;
 import com.aferent.patient_service.model.PatientDocument;
@@ -41,7 +43,7 @@ public class PatientService {
     // helper: generate next patientId (PAT_001, PAT_002, etc.)
     private String generatePatientId() {
         PatientIdSequence sequence = patientIdSequenceRepository.findById("patientIdCounter")
-                .orElseThrow(() -> new RuntimeException("Patient ID sequence not initialized"));
+            .orElseThrow(() -> new ResourceNotFoundException("Patient ID sequence not initialized"));
         sequence.setSequence(sequence.getSequence() + 1);
         PatientIdSequence updated = patientIdSequenceRepository.save(sequence);
         return String.format("PAT_%03d", updated.getSequence());  // e.g., PAT_001, PAT_002
@@ -67,17 +69,17 @@ public class PatientService {
 
     public Patient getProfile(String patientId) {
         return patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
     }
 
     public Patient updateProfile(String patientId, String requesterId, UpdateProfileRequest req) {
         // requesterId is the authId from X-User-ID header
         // security check — patients can only update their own profile
         Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         
         if (!patient.getAuthId().equals(requesterId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenOperationException("Access denied");
         }
         
         if (req.getFirstName() != null) patient.setFirstName(req.getFirstName());
@@ -93,8 +95,8 @@ public class PatientService {
     // Step 1 of document upload — generate presigned URL
     // client uses this URL to upload directly to MinIO
     public PresignedUrlResponse generateUploadUrl(String patientId, String fileName, String contentType) {
-        Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         
         String documentId = UUID.randomUUID().toString();
         // minioKey = folder structure inside the bucket
@@ -113,8 +115,8 @@ public class PatientService {
     // Step 2 of document upload — client calls this AFTER uploading to MinIO
     // saves the metadata so we can find the file later
     public PatientDocument saveDocumentMetadata(String patientId, DocumentMetadataRequest req) {
-        Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         
         PatientDocument doc = PatientDocument.builder()
                 .id(req.getDocumentId())
@@ -130,31 +132,31 @@ public class PatientService {
 
     // returns documents with fresh presigned download URLs
     public List<PatientDocument> getDocuments(String patientId) {
-        Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         return documentRepository.findByPatientIdAndDeletedFalse(patientId);
     }
 
     public String getDocumentDownloadUrl(String patientId, String documentId) {
-        Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         
         PatientDocument doc = documentRepository.findById(documentId)
-                .orElseThrow(() -> new RuntimeException("Document not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
         if (!doc.getPatientId().equals(patientId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenOperationException("Access denied");
         }
         return minioService.generateDownloadUrl(doc.getMinioKey());
     }
 
     public void deleteDocument(String patientId, String documentId) {
-        Patient patient = patientRepository.findByPatientId(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         
         PatientDocument doc = documentRepository.findById(documentId)
-                .orElseThrow(() -> new RuntimeException("Document not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
         if (!doc.getPatientId().equals(patientId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenOperationException("Access denied");
         }
         doc.setDeleted(true);   // soft delete — keep record, hide from listing
         documentRepository.save(doc);
