@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
     @ExceptionHandler(ForbiddenOperationException.class)
-        public ResponseEntity<Map<String, Object>> handleForbidden(
+    public ResponseEntity<Map<String, Object>> handleForbidden(
             ForbiddenOperationException ex,
             HttpServletRequest request
     ) {
@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-        public ResponseEntity<Map<String, Object>> handleNotFound(
+    public ResponseEntity<Map<String, Object>> handleNotFound(
             ResourceNotFoundException ex,
             HttpServletRequest request
     ) {
@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-        public ResponseEntity<Map<String, Object>> handleValidation(
+    public ResponseEntity<Map<String, Object>> handleValidation(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
