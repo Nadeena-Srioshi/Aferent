@@ -1,6 +1,7 @@
 package com.aferent.patient_service.controller;
 
 import com.aferent.patient_service.dto.*;
+import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.model.Patient;
 import com.aferent.patient_service.model.PatientDocument;
 import com.aferent.patient_service.service.PatientService;
@@ -34,7 +35,7 @@ public class PatientController {
         // doctors and admins can view any patient profile
         // patients can only view their own
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(patient);
     }
@@ -58,7 +59,7 @@ public class PatientController {
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (!patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(
                 patientService.generateUploadUrl(patientId, fileName, contentType)
@@ -74,7 +75,7 @@ public class PatientController {
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (!patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(patientService.saveDocumentMetadata(patientId, request));
     }
@@ -88,7 +89,7 @@ public class PatientController {
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(patientService.getDocuments(patientId));
     }
@@ -103,7 +104,7 @@ public class PatientController {
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         String url = patientService.getDocumentDownloadUrl(patientId, documentId);
         return ResponseEntity.ok(Map.of("downloadUrl", url));
@@ -117,7 +118,7 @@ public class PatientController {
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (!patient.getAuthId().equals(authId)) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenOperationException("Access denied");
         }
         patientService.deleteDocument(patientId, documentId);
         return ResponseEntity.noContent().build();
