@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -17,6 +18,18 @@ public class MinioService {
 
     @Value("${minio.bucket}")
     private String bucket;
+
+    @Value("${minio.public-endpoint:}")
+    private String publicEndpoint;
+
+    @Value("${minio.access-key}")
+    private String accessKey;
+
+    @Value("${minio.secret-key}")
+    private String secretKey;
+
+    @Value("${minio.region:us-east-1}")
+    private String region;
 
     // called on startup to make sure bucket exists
     public void ensureBucketExists() {
@@ -39,7 +52,7 @@ public class MinioService {
     // the file never passes through our service or the gateway
     public String generateUploadUrl(String objectKey) {
         try {
-            return minioClient.getPresignedObjectUrl(
+            return getPresignClient().getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(objectKey)
@@ -55,7 +68,7 @@ public class MinioService {
     // generates a URL the client uses to download directly from MinIO
     public String generateDownloadUrl(String objectKey) {
         try {
-            return minioClient.getPresignedObjectUrl(
+            return getPresignClient().getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(objectKey)
@@ -65,6 +78,23 @@ public class MinioService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate download URL: " + e.getMessage());
+        }
+    }
+
+    private MinioClient getPresignClient() {
+        if (publicEndpoint == null || publicEndpoint.isBlank()) {
+            return minioClient;
+        }
+
+        try {
+            return MinioClient.builder()
+                    .endpoint(publicEndpoint.trim())
+                    .region(region)
+                    .credentials(accessKey, secretKey)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Invalid minio.public-endpoint. Falling back to internal endpoint: {}", e.getMessage());
+            return minioClient;
         }
     }
 
