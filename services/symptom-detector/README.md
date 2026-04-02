@@ -185,7 +185,7 @@ All extension points are pre-marked with `NOTE (Phase 2 – ...)` comments.
 ```json
 {
   "specialization": "Cardiology",
-  "version":        "1.0.4",
+  "version":        "v1.0.4",
   "is_active":       true,
   "system_instruction": "You are a specialized Cardiologist...",
   "author":         "admin_user_01",
@@ -195,4 +195,4 @@ All extension points are pre-marked with `NOTE (Phase 2 – ...)` comments.
 }
 ```
 
-To roll out a new prompt version: insert a document with a new semantic `version` (for example `1.0.5`) and set `is_active: true` on the new one after deactivating the previous active version for that specialization.
+To roll out a new prompt version: call `POST /ai/api/v1/prompts` with specialization + system instruction only. The backend generates the next semantic `version` in `v` format (for example `v1.0.5`). Then activate it with `POST /ai/api/v1/prompts/{specialization}/versions/{version}/activate`.

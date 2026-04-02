@@ -95,9 +95,6 @@ services:
       - .env
     environment:
       MONGO_URI: ${MONGO_URI_SYMPTOM_SERVICE}
-    depends_on:
-      mongo:
-        condition: service_healthy
     volumes:
       - ./services/symptom-detector/app:/app/app   # hot-reload in dev; remove in prod
     networks: [aferent-network]

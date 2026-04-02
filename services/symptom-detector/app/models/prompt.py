@@ -12,7 +12,7 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 
-_SEMVER_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
+_SEMVER_PATTERN = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 class PromptDocument(BaseModel):
@@ -39,9 +39,14 @@ class PromptDocument(BaseModel):
     @classmethod
     def _validate_version(cls, value: str) -> str:
         version = value.strip()
-        if not _SEMVER_PATTERN.fullmatch(version):
+        match = _SEMVER_PATTERN.fullmatch(version)
+        if not match:
             raise ValueError("version must be a semantic version string like 'v1.0.4'.")
-        return version
+
+        if version.lower().startswith("v"):
+            return version
+
+        return f"v{match.group(1)}.{match.group(2)}.{match.group(3)}"
 
     @field_validator("system_instruction")
     @classmethod

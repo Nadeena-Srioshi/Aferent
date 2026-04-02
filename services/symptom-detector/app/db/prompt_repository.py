@@ -40,6 +40,14 @@ class PromptRepository:
         return " ".join(value.strip().replace("_", " ").split()).title()
 
     @staticmethod
+    def _canonical_version(version: str) -> str:
+        """Ensure version has v prefix for consistent DB queries."""
+        version = version.strip()
+        if not version.startswith("v"):
+            return f"v{version}"
+        return version
+
+    @staticmethod
     def _semver_key(version: str) -> tuple[int, int, int, str]:
         match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", version.strip())
         if match is None:
@@ -99,6 +107,7 @@ class PromptRepository:
     async def get_by_version(self, specialization: str, version: str) -> PromptDocument:
         """Fetch a specific version of a prompt."""
         specialization = self._canonical_specialization(specialization)
+        version = self._canonical_version(version)
         try:
             doc = await self._col.find_one(
                 {"specialization": specialization, "version": version},
@@ -173,6 +182,7 @@ class PromptRepository:
     ) -> PromptDocument:
         """Patch mutable fields of an existing prompt version."""
         specialization = self._canonical_specialization(specialization)
+        version = self._canonical_version(version)
         updated_by = updated_by.strip()
         if not updated_by:
             raise DatabaseError("Caller identity is required to update prompt versions.")
@@ -208,6 +218,7 @@ class PromptRepository:
     ) -> PromptDocument:
         """Activate or deactivate a specific version."""
         specialization = self._canonical_specialization(specialization)
+        version = self._canonical_version(version)
         await self.get_by_version(specialization, version)
 
         now = datetime.utcnow()
@@ -243,6 +254,7 @@ class PromptRepository:
     async def delete(self, specialization: str, version: str) -> None:
         """Hard-delete a prompt version."""
         specialization = self._canonical_specialization(specialization)
+        version = self._canonical_version(version)
         doc = await self.get_by_version(specialization, version)
 
         if doc.is_active:
