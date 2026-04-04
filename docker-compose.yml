@@ -140,6 +140,20 @@ services:
       kafka:
         condition: service_healthy
 
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: payment-service
+    networks: [aferent-network]
+    ports:
+      - "3005:3005"
+    environment:
+      MONGO_URI: ${MONGO_URI_PAYMENT_SERVICE}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      kafka:
+        condition: service_healthy
+
 networks:
   aferent-network:
     driver: bridge
