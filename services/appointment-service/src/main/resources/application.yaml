@@ -1,0 +1,52 @@
+server:
+  port: ${SERVER_PORT:3004}
+
+spring:
+  application:
+    name: appointment-service
+
+  mongodb:
+    #uri: ${MONGO_URI:mongodb://localhost:27017/appointment_db}
+    uri: mongodb+srv://srioshi_db_user:28k3T9FAK9d9FIIP@cluster0.6vsdh2n.mongodb.net/appointment_db?appName=Cluster0
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: appointment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Internal service URLs — used by WebClient
+services:
+  doctor-service-url: ${DOCTOR_SERVICE_URL:http://doctor-service:3003}
+
+# How far ahead to generate slots (in weeks)
+appointment:
+  slot-generation-weeks-ahead: 4
+  refund-cutoff-hours: 2
+  
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+logging:
+  level:
+    "[com.aferent.appointment_service]": DEBUG
+  pattern:
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
