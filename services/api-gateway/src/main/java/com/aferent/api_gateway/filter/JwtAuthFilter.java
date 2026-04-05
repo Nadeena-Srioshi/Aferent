@@ -34,6 +34,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/auth/refresh",
             "/auth/logout",
             "/payments/webhook",
+            "/sessions/webhooks",
             "/actuator"
     );
 

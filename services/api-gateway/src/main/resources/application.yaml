@@ -69,6 +69,7 @@ app:
     - /auth/refresh
     - /actuator/**
     - /payments/webhook   # payment provider calls this — no JWT, uses HMAC instead
+    - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
 
 logging:
   pattern:
