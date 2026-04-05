@@ -1,0 +1,50 @@
+server:
+  port: ${SERVER_PORT:3005}
+
+spring:
+  application:
+    name: payment-service
+
+  # MongoDB — uses aferent.payment_service database
+  mongodb:
+    #uri: ${MONGO_URI:mongodb://localhost:27017/aferent.payment_service}
+    uri: mongodb+srv://srioshi_db_user:28k3T9FAK9d9FIIP@cluster0.6vsdh2n.mongodb.net/payment_db?appName=Cluster0
+
+  # Kafka
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: payment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Stripe config
+stripe:
+  api-key: ${STRIPE_API_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  currency: usd
+  success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
+  cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
+
+# Actuator — needed for Docker healthcheck
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Logging
+logging:
+  level:
+    "[com.aferent.payment_service]": DEBUG
+  pattern:
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"

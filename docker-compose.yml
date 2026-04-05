@@ -151,6 +151,37 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+    container_name: appointment-service
+    networks: [aferent-network]
+    ports:
+      - "3004:3004"
+    environment:
+      MONGO_URI: ${MONGO_URI_APPOINTMENT_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SERVER_PORT: 3004
+      DOCTOR_SERVICE_URL: http://doctor-service:3003
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: payment-service
+    networks: [aferent-network]
+    ports:
+      - "3005:3005"
+    environment:
+      MONGO_URI: ${MONGO_URI_PAYMENT_SERVICE}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      kafka:
+        condition: service_healthy
 
 networks:
   aferent-network:
