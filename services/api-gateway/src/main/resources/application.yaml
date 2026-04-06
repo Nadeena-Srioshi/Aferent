@@ -26,7 +26,7 @@ spring:
         - id: doctor-service
           uri: http://doctor-service:3003
           predicates:
-            - Path=/doctors/**
+            - Path=/doctors/**, /admin/doctors/**
 
         # APPOINTMENT SERVICE
         - id: appointment-service
