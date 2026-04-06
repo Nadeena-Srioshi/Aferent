@@ -133,8 +133,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      minio:
-        condition: service_started
     environment:
       PORT: 3006
       TELEMEDICINE_DB_DSN: postgres://telemedicine:telemedicine@postgres-telemedicine:5432/telemedicine_db?sslmode=disable
@@ -149,11 +147,6 @@ services:
       AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE}
       AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET}
       AGORA_TOKEN_TTL_SEC: ${AGORA_TOKEN_TTL_SEC}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: telemedicine-recordings
-      MINIO_USE_SSL: "false"
 
 networks:
   aferent-network:
