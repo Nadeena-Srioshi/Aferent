@@ -34,7 +34,10 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/auth/refresh",
             "/auth/logout",
             "/payments/webhook",
-            "/actuator"
+            "/actuator",
+            "/doctors/register/profile",
+            "/doctors/register/license-upload-url",
+            "/doctors/register/license-confirm"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
