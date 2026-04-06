@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telemedicine Test Console</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background: #f5f7fb; color: #111; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 980px; }
+    .card { background: #fff; border: 1px solid #dce2ef; border-radius: 12px; padding: 12px; }
+    label { display: block; margin: 6px 0 2px; font-weight: 600; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #b8c2d8; font-size: 14px; }
+    button { cursor: pointer; background: #1254ff; color: #fff; border: none; }
+    button.secondary { background: #253042; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+    .video-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #0f172a; color: #cbd5e1; padding: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+    #local-video, #remote-video { width: 100%; height: 300px; background: #111827; border-radius: 10px; overflow: hidden; }
+    #local-video video, #remote-video video { width: 100%; height: 100%; object-fit: contain; }
+    .video-label { font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .status-badge { display: inline-block; padding: 4px 8px; background: #e8f5e9; color: #1b5e20; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Telemedicine Test Console</h1>
+  <p>Use this page from laptop and phone on the same network with the same appointment ID.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Appointment ID</label>
+          <input id="appointmentId" value="appt-001" />
+        </div>
+        <div>
+          <label>User ID</label>
+          <input id="userId" value="doctor-001" />
+        </div>
+        <div>
+          <label>Role</label>
+          <select id="role">
+            <option>DOCTOR</option>
+            <option>PATIENT</option>
+          </select>
+        </div>
+        <div>
+          <label>Email</label>
+          <input id="email" value="doctor@example.com" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="joinBtn">Join Session</button>
+        <button id="statusBtn" class="secondary">Check Status</button>
+        <button id="endBtn" class="secondary">End Session</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label><input id="publishAudio" type="checkbox" checked /> Publish Audio</label>
+        <label><input id="publishVideo" type="checkbox" checked /> Publish Video</label>
+      </div>
+      <p id="statusText"></p>
+    </div>
+
+    <div class="card">
+      <h3>Video Preview</h3>
+      <div class="video-row">
+        <div>
+          <div class="video-label">Local <span class="status-badge" id="localAudioStatus"></span></div>
+          <div id="local-video"></div>
+        </div>
+        <div>
+          <div class="video-label">Remote <span class="status-badge" id="remoteAudioStatus"></span> <button id="muteBtn" style="padding: 4px 8px; font-size: 12px; margin-left: auto;">🔊 Mute</button></div>
+          <div id="remote-video"></div>
+        </div>
+      </div>
+      <p style="margin-top:8px; font-size: 12px; color: #666;">If token is dev fallback, media join will fail until Agora credentials are configured.</p>
+    </div>
+
+    <div class="card">
+      <h3>Debug</h3>
+      <div id="debug" class="mono"></div>
+    </div>
+  </div>
+
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+  <script>
+    const debug = (msg, obj) => {
+      const el = document.getElementById('debug');
+      const line = `[${new Date().toISOString()}] ${msg}` + (obj ? `\n${JSON.stringify(obj, null, 2)}` : '');
+      el.textContent = line + '\n\n' + el.textContent;
+      console.log(msg, obj || '');
+    };
+
+    const headers = () => ({
+      'Content-Type': 'application/json',
+      'X-User-ID': document.getElementById('userId').value,
+      'X-User-Role': document.getElementById('role').value,
+      'X-User-Email': document.getElementById('email').value,
+    });
+
+    let client = null;
+    let localTracks = [];
+    let joined = false;
+    let remoteAudioMuted = false;
+    let remoteAudioElement = null;
+    let playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
+
+    function updatePlaybackStatus() {
+      document.getElementById('localAudioStatus').textContent = playbackStatus.localAudio ? '🎤 Audio' : '';
+      document.getElementById('remoteAudioStatus').textContent = playbackStatus.remoteAudio ? '🎤 Audio' : '';
+    }
+
+    async function clearLocalTracks() {
+      for (const t of localTracks) {
+        try { t.stop(); } catch (_) {}
+        try { t.close(); } catch (_) {}
+      }
+      localTracks = [];
+    }
+
+    async function joinSession() {
+      const appointmentId = document.getElementById('appointmentId').value;
+      try {
+        const res = await fetch(`/sessions/join/${appointmentId}`, { method: 'POST', headers: headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        debug('join response', data);
+        document.getElementById('statusText').textContent = `Session status: ${data.status}, otherJoined=${data.otherParticipantJoined}`;
+
+        if (!data.appId || !data.token || data.token.startsWith('dev-')) {
+          debug('Agora credentials not configured - media join will not work');
+          return;
+        }
+
+        if (!client) {
+          client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+          client.on('user-published', async (user, mediaType) => {
+            try {
+              await client.subscribe(user, mediaType);
+              debug('subscribed to user', { uid: user.uid, mediaType });
+              if (mediaType === 'video' && user.videoTrack) {
+                debug('playing remote video', { uid: user.uid });
+                user.videoTrack.play('remote-video');
+                playbackStatus.remoteVideo = true;
+                updatePlaybackStatus();
+              }
+              if (mediaType === 'audio' && user.audioTrack) {
+                debug('playing remote audio', { uid: user.uid });
+                remoteAudioElement = user.audioTrack;
+                user.audioTrack.play();
+                playbackStatus.remoteAudio = true;
+                updatePlaybackStatus();
+              }
+            } catch (e) {
+              debug('subscribe error', { message: e.message, uid: user.uid, mediaType });
+            }
+          });
+          client.on('user-unpublished', (user, mediaType) => {
+            debug('user-unpublished', { uid: user.uid, mediaType });
+            if (mediaType === 'audio') {
+              remoteAudioElement = null;
+              remoteAudioMuted = false;
+              document.getElementById('muteBtn').textContent = '🔊 Mute';
+              playbackStatus.remoteAudio = false;
+              updatePlaybackStatus();
+            }
+            if (mediaType === 'video') {
+              playbackStatus.remoteVideo = false;
+              updatePlaybackStatus();
+            }
+          });
+          client.on('user-left', (user) => {
+            debug('user-left', { uid: user.uid });
+            remoteAudioElement = null;
+            remoteAudioMuted = false;
+            document.getElementById('muteBtn').textContent = '🔊 Mute';
+            playbackStatus.remoteAudio = false;
+            playbackStatus.remoteVideo = false;
+            updatePlaybackStatus();
+          });
+        }
+
+        await client.join(data.appId, data.channelName, data.token, data.uid);
+        joined = true;
+
+        const publishAudio = document.getElementById('publishAudio').checked;
+        const publishVideo = document.getElementById('publishVideo').checked;
+
+        if (publishAudio || publishVideo) {
+          try {
+            localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+            if (publishVideo && localTracks.length > 1) {
+              localTracks[1].play('local-video');
+              playbackStatus.localVideo = true;
+            }
+            if (publishAudio && localTracks.length > 0) {
+              playbackStatus.localAudio = true;
+            }
+            updatePlaybackStatus();
+            await client.publish(localTracks);
+            debug('published tracks', { audio: publishAudio, video: publishVideo });
+          } catch (e) {
+            debug('track creation error', { message: e.message });
+          }
+        }
+      } catch (e) {
+        debug('join error', { message: e.message });
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const appointmentId = document.getElementById('appointmentId').value;
+        const res = await fetch(`/sessions/${appointmentId}/status`, { headers: headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        debug('status response', data);
+        document.getElementById('statusText').textContent = `doctorJoined=${data.doctorJoined}, patientJoined=${data.patientJoined}, remaining=${data.remainingDurationSec}s`;
+      } catch (e) {
+        debug('status error', { message: e.message });
+      }
+    }
+
+    async function endSession() {
+      try {
+        const appointmentId = document.getElementById('appointmentId').value;
+        const res = await fetch(`/sessions/${appointmentId}/end`, { method: 'POST', headers: headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        debug('end response', data);
+        await leaveChannel();
+      } catch (e) {
+        debug('end error', { message: e.message });
+      }
+    }
+
+    async function leaveChannel() {
+      await clearLocalTracks();
+      if (client && joined) {
+        try {
+          await client.leave();
+          joined = false;
+        } catch (e) {
+          debug('leave error', { message: e.message });
+        }
+      }
+      remoteAudioMuted = false;
+      remoteAudioElement = null;
+      playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
+      updatePlaybackStatus();
+      document.getElementById('muteBtn').textContent = '🔊 Mute';
+    }
+
+    document.getElementById('joinBtn').addEventListener('click', () => joinSession().catch(e => debug('join exception', { message: e.message })));
+    document.getElementById('statusBtn').addEventListener('click', () => checkStatus().catch(e => debug('status exception', { message: e.message })));
+    document.getElementById('endBtn').addEventListener('click', () => endSession().catch(e => debug('end exception', { message: e.message })));
+    document.getElementById('muteBtn').addEventListener('click', () => {
+      remoteAudioMuted = !remoteAudioMuted;
+      document.getElementById('muteBtn').textContent = remoteAudioMuted ? '🔇 Unmute' : '🔊 Mute';
+      if (remoteAudioElement) {
+        remoteAudioElement.muted = remoteAudioMuted;
+      }
+      debug('Remote audio muted:', remoteAudioMuted);
+    });
+  </script>
+</body>
+</html>
