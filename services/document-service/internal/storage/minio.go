@@ -116,7 +116,35 @@ func (c *Client) PresignPut(ctx context.Context, objectKey string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("generating presigned PUT URL: %w", err)
 	}
-	return u.String(), nil
+
+	return c.toPublicURL(u.String()), nil
+}
+
+// toPublicURL rewrites the generated URL host/scheme to MINIO_PUBLIC_HOST
+// so browsers can access it from outside Docker.
+func (c *Client) toPublicURL(raw string) string {
+	if strings.TrimSpace(c.cfg.MinioPublicHost) == "" {
+		return raw
+	}
+
+	signedURL, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+
+	publicHost := strings.TrimSpace(c.cfg.MinioPublicHost)
+	if !strings.Contains(publicHost, "://") {
+		publicHost = "http://" + publicHost
+	}
+
+	publicURL, err := url.Parse(publicHost)
+	if err != nil || publicURL.Host == "" {
+		return raw
+	}
+
+	signedURL.Scheme = publicURL.Scheme
+	signedURL.Host = publicURL.Host
+	return signedURL.String()
 }
 
 // PermanentURL builds the non-expiring public URL for a public object.
@@ -134,5 +162,6 @@ func (c *Client) PresignGet(ctx context.Context, objectKey string, ttl time.Dura
 	if err != nil {
 		return "", fmt.Errorf("generating presigned GET URL: %w", err)
 	}
-	return u.String(), nil
+
+	return c.toPublicURL(u.String()), nil
 }

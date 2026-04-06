@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -57,6 +58,7 @@ func (h *PresignUpload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	uploadURL, err := h.store.PresignPut(r.Context(), objectKey)
 	if err != nil {
+		log.Printf("PresignPut error: %v", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody("could not generate upload URL"))
 		return
 	}
