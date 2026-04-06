@@ -5,16 +5,12 @@ import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.exception.ResourceNotFoundException;
 import com.aferent.patient_service.model.Patient;
 import com.aferent.patient_service.model.PatientIdSequence;
-import com.aferent.patient_service.model.PatientDocument;
-import com.aferent.patient_service.repository.DocumentRepository;
 import com.aferent.patient_service.repository.PatientRepository;
 import com.aferent.patient_service.repository.PatientIdSequenceRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,13 +18,10 @@ import java.util.UUID;
 public class PatientService {
 
     private final PatientRepository patientRepository;
-    private final DocumentRepository documentRepository;
     private final PatientIdSequenceRepository patientIdSequenceRepository;
-    private final MinioService minioService;
 
     @PostConstruct   // runs once when service starts up
     public void init() {
-        minioService.ensureBucketExists();
         // initialize patient ID sequence if not exists
         if (!patientIdSequenceRepository.existsById("patientIdCounter")) {
             PatientIdSequence sequence = PatientIdSequence.builder()
@@ -90,76 +83,5 @@ public class PatientService {
         if (req.getBloodGroup() != null) patient.setBloodGroup(req.getBloodGroup());
         if (req.getAddress() != null)   patient.setAddress(req.getAddress());
         return patientRepository.save(patient);
-    }
-
-    // Step 1 of document upload — generate presigned URL
-    // client uses this URL to upload directly to MinIO
-    public PresignedUrlResponse generateUploadUrl(String patientId, String fileName, String contentType) {
-        patientRepository.findByPatientId(patientId)
-            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
-        
-        String documentId = UUID.randomUUID().toString();
-        // minioKey = folder structure inside the bucket
-        String minioKey = "patients/" + patientId + "/" + documentId + "/" + fileName;
-
-        String uploadUrl = minioService.generateUploadUrl(minioKey);
-
-        return PresignedUrlResponse.builder()
-                .uploadUrl(uploadUrl)
-                .documentId(documentId)
-                .minioKey(minioKey)
-                .expirySeconds(900)   // 15 minutes
-                .build();
-    }
-
-    // Step 2 of document upload — client calls this AFTER uploading to MinIO
-    // saves the metadata so we can find the file later
-    public PatientDocument saveDocumentMetadata(String patientId, DocumentMetadataRequest req) {
-        patientRepository.findByPatientId(patientId)
-            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
-        
-        PatientDocument doc = PatientDocument.builder()
-                .id(req.getDocumentId())
-                .patientId(patientId)
-                .originalFileName(req.getOriginalFileName())
-                .contentType(req.getContentType())
-                .fileSize(req.getFileSize())
-                .documentType(req.getDocumentType())
-                .minioKey("patients/" + patientId + "/" + req.getDocumentId() + "/" + req.getOriginalFileName())
-                .build();
-        return documentRepository.save(doc);
-    }
-
-    // returns documents with fresh presigned download URLs
-    public List<PatientDocument> getDocuments(String patientId) {
-        patientRepository.findByPatientId(patientId)
-            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
-        return documentRepository.findByPatientIdAndDeletedFalse(patientId);
-    }
-
-    public String getDocumentDownloadUrl(String patientId, String documentId) {
-        patientRepository.findByPatientId(patientId)
-            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
-        
-        PatientDocument doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
-        if (!doc.getPatientId().equals(patientId)) {
-            throw new ForbiddenOperationException("Access denied");
-        }
-        return minioService.generateDownloadUrl(doc.getMinioKey());
-    }
-
-    public void deleteDocument(String patientId, String documentId) {
-        patientRepository.findByPatientId(patientId)
-            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
-        
-        PatientDocument doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
-        if (!doc.getPatientId().equals(patientId)) {
-            throw new ForbiddenOperationException("Access denied");
-        }
-        doc.setDeleted(true);   // soft delete — keep record, hide from listing
-        documentRepository.save(doc);
-        minioService.deleteObject(doc.getMinioKey());
     }
 }

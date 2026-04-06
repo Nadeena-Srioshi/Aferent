@@ -9,4 +9,6 @@ import java.util.List;
 public interface DocumentRepository extends MongoRepository<PatientDocument, String> {
     // find all non-deleted documents for a patient
     List<PatientDocument> findByPatientIdAndDeletedFalse(String patientId);
+
+    List<PatientDocument> findByPatientIdAndDocumentTypeAndDeletedFalse(String patientId, String documentType);
 }

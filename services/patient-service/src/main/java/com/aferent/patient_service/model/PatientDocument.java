@@ -25,6 +25,8 @@ public class PatientDocument {
     private String contentType;   // e.g. "application/pdf", "image/jpeg"
     private Long fileSize;        // in bytes
     private String minioKey;      // the path inside MinIO bucket
+    private String visibility;    // public or private
+    private String category;      // e.g. medical-reports/PAT_004
     private String documentType;  // e.g. "LAB_REPORT", "PRESCRIPTION", "SCAN"
     @Builder.Default
     private boolean deleted = false;  // soft delete — never actually remove
