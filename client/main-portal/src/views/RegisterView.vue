@@ -6,8 +6,8 @@
       <div class="hidden md:flex w-5/12 flex-col justify-between p-10 relative overflow-hidden"
            style="background: #004D51;">
         <!-- Blobs -->
-        <div class="absolute -top-14 -right-16 w-56 h-56 rounded-full opacity-20" style="background:#00759A;"></div>
-        <div class="absolute -right-10 bottom-16 w-36 h-36 rounded-full opacity-25" style="background:#006064;"></div>
+        <div class="absolute -top-14 -right-16 w-56 h-56 rounded-full opacity-20 bg-action"></div>
+        <div class="absolute -right-10 bottom-16 w-36 h-36 rounded-full opacity-25 bg-primary"></div>
 
         <!-- Logo -->
         <RouterLink to="/" class="flex items-center gap-2 relative z-10">
@@ -74,10 +74,7 @@
             <button
               type="submit"
               :disabled="loading"
-              class="w-full py-3 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              style="background:#006064;"
-              @mouseover="e => e.currentTarget.style.background='#00759A'"
-              @mouseleave="e => e.currentTarget.style.background='#006064'"
+              class="w-full py-3 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-primary hover:bg-action"
             >
               <span v-if="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>
               {{ loading ? 'Saving…' : 'Continue' }}
@@ -105,7 +102,7 @@
 
           <p class="mt-5 text-center text-xs text-gray-400">
             Already have an account?
-            <RouterLink to="/login" class="font-semibold" style="color:#006064;">Sign in</RouterLink>
+            <RouterLink to="/login" class="font-semibold text-primary">Sign in</RouterLink>
           </p>
 
         </div>

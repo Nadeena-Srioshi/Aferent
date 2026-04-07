@@ -8,7 +8,7 @@
       <svg class="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.5" fill="#006064" />
+            <circle cx="2" cy="2" r="1.5" class="text-primary" fill="currentColor" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#dots)" />
@@ -43,22 +43,16 @@
             </RouterLink>
             <RouterLink
               to="/ai-tools"
-              class="inline-flex items-center justify-center gap-2 px-7 py-4 border-2 border-ai text-ai font-semibold rounded-xl hover:bg-ai hover:text-white transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai focus-visible:ring-offset-2"
+              class="group inline-flex items-center justify-center gap-2 px-7 py-4 border-2 border-ai text-ai font-semibold rounded-xl hover:bg-ai transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai focus-visible:ring-offset-2"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="w-5 h-5 text-ai group-hover:text-card transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
-              Try AI Symptom Check
+              <span class="text-ai group-hover:text-card transition-colors duration-200">Try AI Symptom Check</span>
             </RouterLink>
           </div>
 
-          <!-- Trust bar -->
-          <div class="flex flex-wrap gap-6 items-center" role="list" aria-label="Platform statistics">
-            <div v-for="stat in stats" :key="stat.label" class="flex items-center gap-2" role="listitem">
-              <span class="text-2xl font-bold text-primary">{{ stat.value }}</span>
-              <span class="text-xs text-muted leading-tight max-w-[80px]">{{ stat.label }}</span>
-            </div>
-          </div>
+
         </div>
 
         <!-- Right: Visual card stack -->

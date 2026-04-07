@@ -6,8 +6,8 @@
       <div class="hidden md:flex w-5/12 flex-col justify-between p-10 relative overflow-hidden"
            style="background: #004D51;">
         <!-- Blobs -->
-        <div class="absolute -top-14 -right-16 w-56 h-56 rounded-full opacity-20" style="background:#00759A;"></div>
-        <div class="absolute -right-10 bottom-16 w-36 h-36 rounded-full opacity-25" style="background:#006064;"></div>
+        <div class="absolute -top-14 -right-16 w-56 h-56 rounded-full opacity-20 bg-action"></div>
+        <div class="absolute -right-10 bottom-16 w-36 h-36 rounded-full opacity-25 bg-primary"></div>
 
         <!-- Logo -->
         <RouterLink to="/" class="flex items-center gap-2 relative z-10">
@@ -58,7 +58,7 @@
             <div>
               <div class="flex items-center justify-between mb-1.5">
                 <label for="password" class="block text-xs font-medium uppercase tracking-wide text-gray-400">Password</label>
-                <RouterLink to="/forgot-password" class="text-xs font-medium" style="color:#006064;">Forgot password?</RouterLink>
+                <RouterLink to="/forgot-password" class="text-xs font-medium text-primary">Forgot password?</RouterLink>
               </div>
               <input
                 id="password"
@@ -77,10 +77,7 @@
             <button
               type="submit"
               :disabled="loading"
-              class="w-full py-3 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              style="background:#006064;"
-              @mouseover="e => e.currentTarget.style.background='#00759A'"
-              @mouseleave="e => e.currentTarget.style.background='#006064'"
+              class="w-full py-3 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-primary hover:bg-action"
             >
               <span v-if="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>
               {{ loading ? 'Signing in…' : 'Sign in' }}
@@ -108,7 +105,7 @@
 
           <p class="mt-5 text-center text-xs text-gray-400">
             Don't have an account?
-            <RouterLink to="/register" class="font-semibold" style="color:#006064;">Create one free</RouterLink>
+            <RouterLink to="/register" class="font-semibold text-primary">Create one free</RouterLink>
           </p>
 
         </div>
