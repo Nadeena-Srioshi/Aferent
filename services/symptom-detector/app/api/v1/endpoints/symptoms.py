@@ -12,7 +12,7 @@ No business logic lives here.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, status
 
 from app.schemas.symptom import SymptomRequest, SymptomResponse
 from app.services.symptom.orchestrator import SymptomOrchestrator
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/symptoms", tags=["Symptoms"])
 )
 async def analyse_symptoms(
     request: SymptomRequest,
+    x_user_id: str | None = Header(default=None, alias="X-User-ID"),
     orchestrator: SymptomOrchestrator = Depends(get_orchestrator),
 ) -> SymptomResponse:
     """
@@ -40,4 +41,4 @@ async def analyse_symptoms(
     - `0.5 - 0.8` → suggestions + `verification_required: true`
     - `< 0.5` → `escalate_to_human: true`
     """
-    return await orchestrator.process(request)
+    return await orchestrator.process(request, patient_id=x_user_id)

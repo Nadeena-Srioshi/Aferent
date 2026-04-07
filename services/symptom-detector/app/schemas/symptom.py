@@ -16,7 +16,6 @@ from app.models.enums import ConfidenceTier, MedicalCategory
 @dataclass(slots=True)
 class SymptomRequest:
     symptoms: str
-    patient_id: str | None = None
 
 
 @dataclass(slots=True)

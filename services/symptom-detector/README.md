@@ -125,17 +125,18 @@ docker compose --profile dev up --build
 curl -X POST http://localhost:8000/api/v1/symptoms/analyse \
   -H "Content-Type: application/json" \
   -d '{
-    "symptoms": "I have chest pain radiating to my left arm and I am sweating.",
-    "patient_id": "patient-001"
+    "symptoms": "I have chest pain radiating to my left arm and I am sweating."
   }'
 ```
+
+If `X-User-ID` is sent, the service uses it as `patient_id`; otherwise `patient_id` is `null` because this route is public.
 
 ### Example Response (HIGH tier)
 
 ```json
 {
   "request_id": "a3f1c2d4-...",
-  "patient_id": "patient-001",
+  "patient_id": null,
   "category": "cardiology",
   "confidence_score": 0.91,
   "confidence_tier": "high",

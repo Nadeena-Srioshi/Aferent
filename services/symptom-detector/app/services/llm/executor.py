@@ -18,6 +18,15 @@ from app.schemas.symptom import LLMAnalysisResult
 
 logger = get_logger(__name__)
 
+_LOG_PREVIEW_CHARS = 220
+
+
+def _preview_text(value: str, *, max_chars: int = _LOG_PREVIEW_CHARS) -> str:
+    text = " ".join((value or "").split())
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]}..."
+
 
 class LLMExecutor:
     def __init__(self) -> None:
@@ -25,6 +34,14 @@ class LLMExecutor:
 
     async def execute(self, *, prompt: PromptDocument, symptoms: str) -> LLMAnalysisResult:
         """Execute model inference, falling back to heuristic logic on failures."""
+        logger.info(
+            "llm_executor.request model=%s specialization=%s version=%s system_instruction_preview=%s symptoms_preview=%s",
+            self._settings.gemini_model,
+            prompt.specialization,
+            prompt.version,
+            _preview_text(prompt.system_instruction),
+            _preview_text(symptoms),
+        )
         try:
             return await self._execute_gemini(prompt=prompt, symptoms=symptoms)
         except Exception as exc:
@@ -99,6 +116,16 @@ class LLMExecutor:
         reasoning = str(parsed["reasoning"]).strip()
         if not reasoning:
             raise LLMExecutionError("LLM returned empty reasoning.")
+
+        logger.info(
+            "llm_executor.response model=%s specialization=%s version=%s confidence_score=%.4f suggestions_count=%s reasoning_preview=%s",
+            self._settings.gemini_model,
+            prompt.specialization,
+            prompt.version,
+            confidence,
+            len(suggestions),
+            _preview_text(reasoning),
+        )
 
         return LLMAnalysisResult(
             confidence_score=confidence,

@@ -44,12 +44,14 @@ This is the user-facing endpoint the frontend should call through the gateway.
 
 **POST** `/ai/api/v1/symptoms/analyse`
 
+This is a public route. If `X-User-ID` is present, the service uses it as `patient_id`.
+If the header is not present, `patient_id` is returned as `null`.
+
 **Body:**
 
 ```json
 {
-  "symptoms": "I have chest pain radiating to my left arm and I am sweating.",
-  "patient_id": "patient-001"
+  "symptoms": "I have chest pain radiating to my left arm and I am sweating."
 }
 ```
 
@@ -75,7 +77,7 @@ POST {{GATEWAY_BASE_URL}}/ai/api/v1/symptoms/analyse
 ```json
 {
   "request_id": "uuid-string",
-  "patient_id": "patient-001",
+  "patient_id": "admin_user_01",
   "category": "cardiology",
   "confidence_score": 0.91,
   "confidence_tier": "high",
@@ -254,3 +256,5 @@ Then reuse them in request headers:
 X-User-Role: {{USER_ROLE}}
 X-User-ID: {{USER_ID}}
 ```
+
+For the public symptom analysis route, `X-User-ID` is optional; when omitted, `patient_id` will be `null`.
