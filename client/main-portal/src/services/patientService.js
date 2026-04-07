@@ -2,6 +2,12 @@ const API_BASE_URL = (
 	import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 ).replace(/\/$/, '')
 
+function authHeaders(token) {
+	return {
+		Authorization: `Bearer ${token}`,
+	}
+}
+
 async function request(path, options = {}) {
 	const { headers: customHeaders, ...restOptions } = options
 
@@ -31,46 +37,34 @@ async function request(path, options = {}) {
 	return payload
 }
 
-export async function login({ email, password }) {
-	return request('/auth/login', {
-		method: 'POST',
-		body: JSON.stringify({ email, password }),
+export async function getCurrentProfile({ token }) {
+	return request('/patients/me', {
+		headers: authHeaders(token),
 	})
 }
 
-export async function register({ email, password, role = 'PATIENT' }) {
-	return request('/auth/register', {
-		method: 'POST',
-		body: JSON.stringify({ email, password, role }),
+export async function getProfile({ patientId, token }) {
+	return request(`/patients/${patientId}`, {
+		headers: authHeaders(token),
 	})
 }
 
-export async function refresh() {
-	return request('/auth/refresh', {
-		method: 'POST',
+export async function updateProfile({ patientId, token, payload }) {
+	return request(`/patients/${patientId}`, {
+		method: 'PUT',
+		headers: authHeaders(token),
+		body: JSON.stringify(payload),
 	})
 }
 
-export async function logout() {
-	return request('/auth/logout', {
-		method: 'POST',
-	})
-}
-
-export async function deactivateSelf({ reason, token }) {
-	const query = reason ? `?reason=${encodeURIComponent(reason)}` : ''
-	return request(`/auth/deactivate${query}`, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-	})
+export async function resolvePatientId({ token }) {
+	const me = await getCurrentProfile({ token })
+	return me?.patientId || null
 }
 
 export default {
-	login,
-	register,
-	refresh,
-	logout,
-	deactivateSelf,
+	getCurrentProfile,
+	getProfile,
+	updateProfile,
+	resolvePatientId,
 }

@@ -2,17 +2,12 @@
   <section class="relative bg-surface overflow-hidden" aria-labelledby="hero-heading">
     <!-- Subtle background pattern -->
     <div class="absolute inset-0 pointer-events-none" aria-hidden="true">
+      <div
+        class="absolute inset-0 bg-center bg-cover opacity-10"
+        :style="{ backgroundImage: `url(${heroBgImage})` }"
+      />
       <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full translate-x-1/3 -translate-y-1/4" />
       <div class="absolute bottom-0 left-0 w-[400px] h-[400px] bg-ai/5 rounded-full -translate-x-1/4 translate-y-1/4" />
-      <!-- Dot grid pattern -->
-      <svg class="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.5" class="text-primary" fill="currentColor" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dots)" />
-      </svg>
     </div>
 
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10 lg:pt-24 lg:pb-16">
@@ -36,23 +31,17 @@
               to="/register"
               class="inline-flex items-center justify-center gap-2 px-7 py-4 bg-primary text-white font-semibold rounded-xl hover:bg-action shadow-sm hover:shadow-md transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
+              <CalendarDays class="w-5 h-5" aria-hidden="true" />
               Book an Appointment
             </RouterLink>
             <RouterLink
-              to="/ai-tools"
+              to="/about"
               class="group inline-flex items-center justify-center gap-2 px-7 py-4 border-2 border-ai text-ai font-semibold rounded-xl hover:bg-ai transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai focus-visible:ring-offset-2"
             >
-              <svg class="w-5 h-5 text-ai group-hover:text-card transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
+              <Sparkles class="w-5 h-5 text-ai group-hover:text-card transition-colors duration-200" aria-hidden="true" />
               <span class="text-ai group-hover:text-card transition-colors duration-200">Try AI Symptom Check</span>
             </RouterLink>
           </div>
-
-
         </div>
 
         <!-- Right: Visual card stack -->
@@ -70,14 +59,10 @@
                 <span class="bg-success/10 text-success text-xs font-semibold px-3 py-1 rounded-full">Confirmed</span>
               </div>
               <div class="flex items-center gap-3 text-sm text-muted mb-4">
-                <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
+                <CalendarDays class="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true" />
                 <span>Tomorrow, 10:30 AM</span>
                 <span class="w-1 h-1 rounded-full bg-border" aria-hidden="true"></span>
-                <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                </svg>
+                <Video class="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true" />
                 <span>Video Consult</span>
               </div>
               <div class="w-full h-2 bg-surface rounded-full overflow-hidden">
@@ -89,9 +74,7 @@
             <!-- AI insight chip -->
             <div class="bg-ai/10 border border-ai/20 rounded-2xl p-4 flex items-start gap-3">
               <div class="w-9 h-9 rounded-xl bg-ai flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
+                <Sparkles class="w-5 h-5 text-white" aria-hidden="true" />
               </div>
               <div>
                 <p class="text-xs font-semibold text-ai mb-0.5">AI Health Insight</p>
@@ -109,6 +92,8 @@
 
 <script setup>
 import { RouterLink } from 'vue-router'
+import { CalendarDays, Sparkles, Video } from 'lucide-vue-next'
+import heroBgImage from '@/assets/image1.jpg'
 
 const stats = [
   { value: '50K+', label: 'Patients served' },
