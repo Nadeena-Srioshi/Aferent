@@ -226,35 +226,14 @@
         joined = true;
         const pubA = document.getElementById('publishAudio').checked, pubV = document.getElementById('publishVideo').checked;
         if (pubA || pubV) {
-          const tracks = [];
-          // Create mic and camera separately so a camera failure doesn't block audio.
-          // On Linux, two browsers cannot share the same camera — the second one will
-          // get NotReadableError. Audio still publishes so the other participant can hear you.
-          if (pubA) {
-            try {
-              const mic = await AgoraRTC.createMicrophoneAudioTrack();
-              tracks.push(mic);
-              playbackStatus.localAudio = true;
-            } catch (e) { debug('mic unavailable: ' + e.message); }
-          }
-          if (pubV) {
-            try {
-              const cam = await AgoraRTC.createCameraVideoTrack();
-              tracks.push(cam);
-              cam.play('local-video');
-              playbackStatus.localVideo = true;
-            } catch (e) { debug('camera unavailable (may be in use by another tab/browser on this machine): ' + e.message); }
-          }
-          localTracks = tracks;
-          if (tracks.length > 0) {
-            try {
-              await client.publish(tracks);
-              debug('published ' + tracks.length + ' track(s)' + (playbackStatus.localVideo ? ' [audio+video]' : ' [audio only — camera in use]'));
-            } catch (e) { debug('publish error', { message: e.message }); }
-          } else {
-            debug('no tracks published — check mic/camera permissions');
-          }
-          updatePlaybackStatus();
+          try {
+            localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+            if (pubV && localTracks.length > 1) { localTracks[1].play('local-video'); playbackStatus.localVideo = true; }
+            if (pubA) { playbackStatus.localAudio = true; }
+            updatePlaybackStatus();
+            await client.publish(localTracks);
+            debug('published tracks');
+          } catch (e) { debug('track error', { message: e.message }); }
         }
       } catch (e) { debug('join error', { message: e.message }); }
     }
