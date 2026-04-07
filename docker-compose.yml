@@ -120,8 +120,8 @@ services:
       - >
         mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
         mc mb --ignore-existing local/app-storage &&
-        mc event remove local/app-storage arn:minio:sqs::PRIMARY:kafka || true;
-        mc event add local/app-storage arn:minio:sqs::PRIMARY:kafka --event put &&
+        mc event add local/app-storage arn:minio:sqs::PRIMARY:kafka --event put ||
+        echo "MinIO Kafka notification already exists/overlaps; keeping current bucket notification config.";
         mc event list local/app-storage
     restart: "no"
 

@@ -43,6 +43,18 @@ public class PatientController {
         return ResponseEntity.ok(patient);
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<Patient> getCurrentProfile(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"PATIENT".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        return ResponseEntity.ok(patientService.getProfileByAuthId(authId));
+    }
+
     @PutMapping("/{patientId}")
     public ResponseEntity<Patient> updateProfile(
             @PathVariable String patientId,

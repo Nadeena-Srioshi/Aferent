@@ -45,19 +45,18 @@ public class PatientService {
     // called by Kafka consumer when user.registered event arrives
     // creates an empty patient profile linked to the auth authId
     public Patient createProfile(String authId, String email) {
-        if (patientRepository.existsByEmail(email)) {
-            log.info("Profile already exists for email: {}", email);
-            return patientRepository.findByEmail(email).orElseThrow();
-        }
-        
-        String patientId = generatePatientId();
-        Patient patient = Patient.builder()
-                .authId(authId)          // auth-service user ID
-                .patientId(patientId)    // human-readable ID (PAT_001, etc.)
-                .email(email)
-                .build();
-        log.info("Creating patient profile: authId={}, patientId={}, email={}", authId, patientId, email);
-        return patientRepository.save(patient);
+        return patientRepository.findByAuthId(authId)
+                .or(() -> patientRepository.findByEmail(email))
+                .orElseGet(() -> {
+                    String patientId = generatePatientId();
+                    Patient patient = Patient.builder()
+                            .authId(authId)          // auth-service user ID
+                            .patientId(patientId)    // human-readable ID (PAT_001, etc.)
+                            .email(email)
+                            .build();
+                    log.info("Creating patient profile: authId={}, patientId={}, email={}", authId, patientId, email);
+                    return patientRepository.save(patient);
+                });
     }
 
     public Patient getProfile(String patientId) {
