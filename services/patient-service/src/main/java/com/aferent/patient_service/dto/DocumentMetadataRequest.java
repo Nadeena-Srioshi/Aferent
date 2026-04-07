@@ -9,6 +9,7 @@ public class DocumentMetadataRequest {
     private String visibility;
     private String category;
     private String originalFileName;
+    private String displayName;
     private String contentType;
     private Long fileSize;
     private String documentType;   // LAB_REPORT, PRESCRIPTION, SCAN etc

@@ -28,6 +28,13 @@ document-service:
   base-url: ${DOCUMENT_SERVICE_URL:http://document-service:3009}
   service-id: ${DOCUMENT_SERVICE_ID:patient-service}
 
+app:
+  upload-events:
+    topic: ${UPLOAD_EVENTS_TOPIC:minio.events}
+  uploads:
+    pending-retention-hours: ${UPLOAD_PENDING_RETENTION_HOURS:24}
+    bucket: ${UPLOAD_BUCKET:app-storage}
+
 logging:
   pattern:
     console: "%d{HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"

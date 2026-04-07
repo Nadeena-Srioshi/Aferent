@@ -7,25 +7,55 @@ import com.aferent.patient_service.exception.ResourceNotFoundException;
 import com.aferent.patient_service.model.Patient;
 import com.aferent.patient_service.model.PatientDocument;
 import com.aferent.patient_service.model.PatientDocumentType;
+import com.aferent.patient_service.model.UploadStatus;
 import com.aferent.patient_service.repository.DocumentRepository;
 import com.aferent.patient_service.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PatientDocumentService {
 
     private final PatientRepository patientRepository;
     private final DocumentRepository documentRepository;
     private final DocumentServiceGateway documentServiceGateway;
 
+    @Value("${app.uploads.pending-retention-hours:24}")
+    private int pendingRetentionHours;
+
+    @Value("${app.uploads.bucket:app-storage}")
+    private String storageBucket;
+
+    public PresignedUrlResponse generateUploadUrlForCurrentUser(String authId, String fileName, String contentType,
+                                PatientDocumentType type, String displayName) {
+    Patient patient = patientRepository.findByAuthId(authId)
+        .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for authenticated user"));
+
+    return generateUploadUrlInternal(patient, fileName, contentType, type, displayName);
+    }
+
     public PresignedUrlResponse generateUploadUrl(String patientId, String fileName, String contentType, PatientDocumentType type) {
         Patient patient = patientRepository.findByPatientId(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+    return generateUploadUrlInternal(patient, fileName, contentType, type, null);
+    }
+
+    private PresignedUrlResponse generateUploadUrlInternal(Patient patient, String fileName, String contentType,
+                               PatientDocumentType type, String displayName) {
+    String safeFileName = (fileName == null || fileName.isBlank()) ? "file" : fileName;
+    String safeContentType = (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
 
         String documentId = UUID.randomUUID().toString();
         String category = type.categoryPrefix() + "/" + patient.getPatientId();
@@ -33,14 +63,38 @@ public class PatientDocumentService {
         DocumentServiceGateway.PresignUploadResult presignResult = documentServiceGateway.generateUploadUrl(
                 type.visibility(),
                 category,
-                fileName,
+        safeFileName,
                 type.appendUuid()
         );
+
+    String objectKey = presignResult.objectKey();
+    if (objectKey == null || objectKey.isBlank()) {
+        objectKey = deriveObjectKeyFromUrl(presignResult.permanentUrl() != null ? presignResult.permanentUrl() : presignResult.uploadUrl());
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    PatientDocument pending = PatientDocument.builder()
+        .id(documentId)
+        .patientId(patient.getPatientId())
+        .fileName(safeFileName)
+        .originalFileName(safeFileName)
+        .displayName((displayName == null || displayName.isBlank()) ? safeFileName : displayName)
+        .contentType(safeContentType)
+        .minioKey(objectKey)
+        .visibility(type.visibility())
+        .category(category)
+        .documentType(type.name())
+        .uploadStatus(UploadStatus.PENDING_UPLOAD)
+        .requestedAt(now)
+        .expiresAt(now.plusHours(pendingRetentionHours))
+        .build();
+
+    documentRepository.save(pending);
 
         return PresignedUrlResponse.builder()
                 .uploadUrl(presignResult.uploadUrl())
                 .documentId(documentId)
-                .minioKey(presignResult.objectKey())
+        .minioKey(objectKey)
                 .permanentUrl(presignResult.permanentUrl())
                 .visibility(type.visibility())
                 .category(category)
@@ -69,18 +123,43 @@ public class PatientDocumentService {
             minioKey = "patient-service/" + visibility + "/" + category + "/" + fileName;
         }
 
+        PatientDocument existing = documentRepository.findById(req.getDocumentId()).orElse(null);
+        if (existing != null) {
+            existing.setOriginalFileName(req.getOriginalFileName());
+            existing.setFileName(req.getOriginalFileName());
+            existing.setDisplayName((req.getDisplayName() == null || req.getDisplayName().isBlank())
+                    ? existing.getDisplayName()
+                    : req.getDisplayName());
+            existing.setContentType(req.getContentType());
+            existing.setFileSize(req.getFileSize());
+            existing.setMinioKey(minioKey);
+            existing.setVisibility(visibility);
+            existing.setCategory(category);
+            existing.setDocumentType(type.name());
+            existing.setUploadStatus(UploadStatus.UPLOADED);
+            if (existing.getUploadedAt() == null) {
+                existing.setUploadedAt(LocalDateTime.now());
+            }
+            return documentRepository.save(existing);
+        }
+
         return documentRepository.save(PatientDocument.builder()
-                .id(req.getDocumentId())
-                .patientId(patientId)
-                .fileName(req.getOriginalFileName())
-                .originalFileName(req.getOriginalFileName())
-                .contentType(req.getContentType())
-                .fileSize(req.getFileSize())
-                .minioKey(minioKey)
-                .visibility(visibility)
-                .category(category)
-                .documentType(type.name())
-                .build());
+            .id(req.getDocumentId())
+            .patientId(patientId)
+            .fileName(req.getOriginalFileName())
+            .originalFileName(req.getOriginalFileName())
+            .displayName((req.getDisplayName() == null || req.getDisplayName().isBlank()) ? req.getOriginalFileName() : req.getDisplayName())
+            .contentType(req.getContentType())
+            .fileSize(req.getFileSize())
+            .minioKey(minioKey)
+            .visibility(visibility)
+            .category(category)
+            .documentType(type.name())
+            .uploadStatus(UploadStatus.UPLOADED)
+            .requestedAt(LocalDateTime.now())
+            .uploadedAt(LocalDateTime.now())
+            .expiresAt(LocalDateTime.now().plusHours(pendingRetentionHours))
+            .build());
     }
 
     public List<PatientDocument> getDocuments(String patientId, String documentType) {
@@ -102,7 +181,16 @@ public class PatientDocumentService {
         if (!doc.getPatientId().equals(patientId)) {
             throw new ForbiddenOperationException("Access denied");
         }
+        if (doc.getUploadStatus() != UploadStatus.UPLOADED) {
+            throw new ForbiddenOperationException("Document is not yet available for viewing");
+        }
         return documentServiceGateway.generateDownloadUrl(doc.getMinioKey(), 3600);
+    }
+
+    public String getDocumentDownloadUrlForCurrentUser(String authId, String documentId) {
+        Patient patient = patientRepository.findByAuthId(authId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for authenticated user"));
+        return getDocumentDownloadUrl(patient.getPatientId(), documentId);
     }
 
     public void deleteDocument(String patientId, String documentId) {
@@ -116,5 +204,102 @@ public class PatientDocumentService {
         }
         doc.setDeleted(true);
         documentRepository.save(doc);
+    }
+
+    public void markUploadedByObjectKey(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+
+        List<String> candidates = Arrays.asList(
+                objectKey,
+                stripBucketPrefix(objectKey)
+        );
+
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            List<PatientDocument> pendingDocs = documentRepository.findByMinioKeyAndUploadStatus(candidate, UploadStatus.PENDING_UPLOAD);
+            if (pendingDocs.isEmpty()) {
+                List<PatientDocument> sameKeyDocs = documentRepository.findByMinioKey(candidate);
+                List<PatientDocument> toUpdate = sameKeyDocs.stream()
+                        .filter(doc -> doc.getUploadStatus() != UploadStatus.UPLOADED)
+                        .toList();
+                if (!toUpdate.isEmpty()) {
+                    LocalDateTime uploadedAt = LocalDateTime.now();
+                    for (PatientDocument doc : toUpdate) {
+                        doc.setUploadStatus(UploadStatus.UPLOADED);
+                        if (doc.getUploadedAt() == null) {
+                            doc.setUploadedAt(uploadedAt);
+                        }
+                    }
+                    documentRepository.saveAll(toUpdate);
+                    log.info("Marked {} existing upload record(s) completed for key={}", toUpdate.size(), candidate);
+                    return;
+                }
+                continue;
+            }
+
+            LocalDateTime uploadedAt = LocalDateTime.now();
+            for (PatientDocument doc : pendingDocs) {
+                doc.setUploadStatus(UploadStatus.UPLOADED);
+                doc.setUploadedAt(uploadedAt);
+            }
+            documentRepository.saveAll(pendingDocs);
+            log.info("Marked {} pending upload(s) completed for key={}", pendingDocs.size(), candidate);
+            return;
+        }
+
+        log.warn("Received upload event but found no pending record for key={}", objectKey);
+    }
+
+    @Scheduled(cron = "0 */10 * * * *")
+    public void expirePendingUploads() {
+        LocalDateTime now = LocalDateTime.now();
+        List<PatientDocument> stale = documentRepository.findByUploadStatusAndExpiresAtBefore(UploadStatus.PENDING_UPLOAD, now);
+        if (stale.isEmpty()) {
+            return;
+        }
+        stale.forEach(doc -> doc.setUploadStatus(UploadStatus.EXPIRED));
+        documentRepository.saveAll(stale);
+        log.info("Expired {} pending uploads older than retention threshold", stale.size());
+    }
+
+    private String deriveObjectKeyFromUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(url);
+            String path = uri.getPath();
+            if (path == null || path.isBlank()) {
+                return null;
+            }
+            String normalized = path.startsWith("/") ? path.substring(1) : path;
+            return stripBucketPrefix(normalized);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String stripBucketPrefix(String rawKey) {
+        if (rawKey == null) {
+            return null;
+        }
+
+        String prefix = storageBucket + "/";
+        if (rawKey.startsWith(prefix) && rawKey.length() > prefix.length()) {
+            return rawKey.substring(prefix.length());
+        }
+
+        if (rawKey.startsWith("/" + prefix) && rawKey.length() > prefix.length() + 1) {
+            return rawKey.substring(prefix.length() + 1);
+        }
+
+        if (rawKey.isBlank()) {
+            return rawKey;
+        }
+        return rawKey;
     }
 }

@@ -65,6 +65,11 @@ public class PatientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
     }
 
+    public Patient getProfileByAuthId(String authId) {
+        return patientRepository.findByAuthId(authId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for authenticated user"));
+    }
+
     public Patient updateProfile(String patientId, String requesterId, UpdateProfileRequest req) {
         // requesterId is the authId from X-User-ID header
         // security check — patients can only update their own profile

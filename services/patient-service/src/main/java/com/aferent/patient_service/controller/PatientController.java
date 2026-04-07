@@ -70,6 +70,26 @@ public class PatientController {
         );
     }
 
+        // Preferred frontend route — derives patient identity from JWT (X-User-ID)
+        @PostMapping("/me/documents/upload-url")
+        public ResponseEntity<PresignedUrlResponse> getUploadUrlForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestParam String fileName,
+            @RequestParam String contentType,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String displayName
+        ) {
+        return ResponseEntity.ok(
+            patientDocumentService.generateUploadUrlForCurrentUser(
+                authId,
+                fileName,
+                contentType,
+                PatientDocumentType.fromString(documentType),
+                displayName
+            )
+        );
+        }
+
     // Step 2 — confirm upload completed, save metadata
     @PostMapping("/{patientId}/documents")
     public ResponseEntity<PatientDocument> saveDocument(
@@ -81,6 +101,16 @@ public class PatientController {
         if (!patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
+        return ResponseEntity.ok(patientDocumentService.saveDocumentMetadata(patientId, request));
+    }
+
+    // Optional fallback completion route for frontend recovery flows
+    @PostMapping("/me/documents")
+    public ResponseEntity<PatientDocument> saveDocumentForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestBody DocumentMetadataRequest request
+    ) {
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
         return ResponseEntity.ok(patientDocumentService.saveDocumentMetadata(patientId, request));
     }
 
@@ -99,6 +129,15 @@ public class PatientController {
         return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
     }
 
+    @GetMapping("/me/documents")
+    public ResponseEntity<List<PatientDocument>> getDocumentsForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestParam(required = false) String documentType
+    ) {
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
+        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
+    }
+
     // get a presigned download URL for a specific document
     @GetMapping("/{patientId}/documents/{documentId}/download-url")
     public ResponseEntity<Map<String, String>> getDownloadUrl(
@@ -112,6 +151,15 @@ public class PatientController {
             throw new ForbiddenOperationException("Access denied");
         }
         String url = patientDocumentService.getDocumentDownloadUrl(patientId, documentId);
+        return ResponseEntity.ok(Map.of("downloadUrl", url));
+    }
+
+    @GetMapping("/me/documents/{documentId}/download-url")
+    public ResponseEntity<Map<String, String>> getDownloadUrlForCurrentUser(
+            @PathVariable String documentId,
+            @RequestHeader("X-User-ID") String authId
+    ) {
+        String url = patientDocumentService.getDocumentDownloadUrlForCurrentUser(authId, documentId);
         return ResponseEntity.ok(Map.of("downloadUrl", url));
     }
 
