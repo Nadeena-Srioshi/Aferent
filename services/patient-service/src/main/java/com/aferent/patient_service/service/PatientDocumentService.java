@@ -81,6 +81,7 @@ public class PatientDocumentService {
         .displayName((displayName == null || displayName.isBlank()) ? safeFileName : displayName)
         .contentType(safeContentType)
         .minioKey(objectKey)
+        .permanentUrl(presignResult.permanentUrl())
         .visibility(type.visibility())
         .category(category)
         .documentType(type.name())
@@ -93,12 +94,7 @@ public class PatientDocumentService {
 
         return PresignedUrlResponse.builder()
                 .uploadUrl(presignResult.uploadUrl())
-                .documentId(documentId)
-        .minioKey(objectKey)
                 .permanentUrl(presignResult.permanentUrl())
-                .visibility(type.visibility())
-                .category(category)
-                .expirySeconds(900)
                 .build();
     }
 
@@ -133,6 +129,9 @@ public class PatientDocumentService {
             existing.setContentType(req.getContentType());
             existing.setFileSize(req.getFileSize());
             existing.setMinioKey(minioKey);
+            if (req.getPermanentUrl() != null && !req.getPermanentUrl().isBlank()) {
+                existing.setPermanentUrl(req.getPermanentUrl());
+            }
             existing.setVisibility(visibility);
             existing.setCategory(category);
             existing.setDocumentType(type.name());
@@ -152,6 +151,7 @@ public class PatientDocumentService {
             .contentType(req.getContentType())
             .fileSize(req.getFileSize())
             .minioKey(minioKey)
+            .permanentUrl(req.getPermanentUrl())
             .visibility(visibility)
             .category(category)
             .documentType(type.name())
@@ -184,6 +184,13 @@ public class PatientDocumentService {
         if (doc.getUploadStatus() != UploadStatus.UPLOADED) {
             throw new ForbiddenOperationException("Document is not yet available for viewing");
         }
+
+        if ("public".equalsIgnoreCase(doc.getVisibility())
+                && doc.getPermanentUrl() != null
+                && !doc.getPermanentUrl().isBlank()) {
+            return doc.getPermanentUrl();
+        }
+
         return documentServiceGateway.generateDownloadUrl(doc.getMinioKey(), 3600);
     }
 

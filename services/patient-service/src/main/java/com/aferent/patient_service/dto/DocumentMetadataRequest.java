@@ -6,6 +6,7 @@ import lombok.Data;
 public class DocumentMetadataRequest {
     private String documentId;
     private String minioKey;
+    private String permanentUrl;
     private String visibility;
     private String category;
     private String originalFileName;
