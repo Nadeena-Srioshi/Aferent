@@ -10,13 +10,11 @@
         :class="appointment.type === 'video' ? 'bg-ai/10' : 'bg-primary/10'"
         aria-hidden="true"
       >
-        <svg class="w-5 h-5" :class="appointment.type === 'video' ? 'text-ai' : 'text-primary'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            :d="appointment.type === 'video'
-              ? 'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'
-              : 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'"
-          />
-        </svg>
+        <component
+          :is="appointment.type === 'video' ? Video : CalendarDays"
+          class="w-5 h-5"
+          :class="appointment.type === 'video' ? 'text-ai' : 'text-primary'"
+        />
       </div>
 
       <!-- Info -->
@@ -36,15 +34,11 @@
 
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted">
           <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
+            <CalendarDays class="w-3.5 h-3.5" aria-hidden="true" />
             {{ appointment.date }}
           </span>
           <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <Clock3 class="w-3.5 h-3.5" aria-hidden="true" />
             {{ appointment.time }}
           </span>
           <span class="capitalize">{{ appointment.type }} consult</span>
@@ -81,6 +75,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { CalendarDays, Clock3, Video } from 'lucide-vue-next'
 
 const props = defineProps({
   appointment: {

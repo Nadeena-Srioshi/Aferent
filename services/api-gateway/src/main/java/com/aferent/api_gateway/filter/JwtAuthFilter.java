@@ -75,15 +75,24 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            // Strip the JWT and inject plain headers instead
-            // Downstream services read these — they never see the raw JWT
-            ServerHttpRequest mutatedRequest = exchange.getRequest()
+                // For auth-service paths, preserve Authorization so auth-service can
+                // perform role-sensitive operations like /auth/admin/** and /auth/deactivate.
+                boolean isAuthServicePath = path.startsWith("/auth/");
+
+                // For non-auth services, strip raw JWT and forward identity headers only.
+                ServerHttpRequest.Builder requestBuilder = exchange.getRequest()
                     .mutate()
                     .header("X-User-ID", claims.getSubject())
                     .header("X-User-Role", claims.get("role", String.class))
-                    .header("X-User-Email", claims.get("email", String.class))
-                    .header("Authorization", "")   // strip the JWT
-                    .build();
+                    .header("X-User-Email", claims.get("email", String.class));
+
+                if (isAuthServicePath) {
+                    requestBuilder.header("Authorization", authHeader);
+                } else {
+                    requestBuilder.headers(headers -> headers.remove("Authorization")); // strip JWT outside auth-service
+                }
+
+                ServerHttpRequest mutatedRequest = requestBuilder.build();
 
             log.info("Authenticated userId={} role={} path={}",
                     claims.getSubject(),

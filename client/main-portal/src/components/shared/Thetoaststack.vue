@@ -31,9 +31,7 @@
             :class="iconBg(n.type)"
             aria-hidden="true"
           >
-            <svg class="w-4 h-4" :class="iconColor(n.type)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" :d="iconPath(n.type)" />
-            </svg>
+            <component :is="iconFor(n.type)" class="w-4 h-4" :class="iconColor(n.type)" />
           </div>
 
           <!-- Message -->
@@ -45,9 +43,7 @@
             :aria-label="`Dismiss notification: ${n.message}`"
             @click="dismiss(n.id)"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X class="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </TransitionGroup>
@@ -58,6 +54,7 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-vue-next'
 
 const store = useNotificationStore()
 const { notifications } = storeToRefs(store)
@@ -84,10 +81,10 @@ const iconColor = (type) => ({
   info:    'text-primary',
 }[type] ?? 'text-muted')
 
-const iconPath = (type) => ({
-  success: 'M5 13l4 4L19 7',
-  error:   'M6 18L18 6M6 6l12 12',
-  warning: 'M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
-  info:    'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-}[type] ?? 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z')
+const iconFor = (type) => ({
+  success: CheckCircle2,
+  error:   AlertCircle,
+  warning: TriangleAlert,
+  info:    Info,
+}[type] ?? Info)
 </script>

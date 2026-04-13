@@ -3,13 +3,15 @@ const API_BASE_URL = (
 ).replace(/\/$/, '')
 
 async function request(path, options = {}) {
+	const { headers: customHeaders, ...restOptions } = options
+
 	const response = await fetch(`${API_BASE_URL}${path}`, {
 		credentials: 'include',
+		...restOptions,
 		headers: {
 			'Content-Type': 'application/json',
-			...(options.headers || {}),
+			...(customHeaders || {}),
 		},
-		...options,
 	})
 
 	const contentType = response.headers.get('content-type') || ''
@@ -21,7 +23,9 @@ async function request(path, options = {}) {
 		const message = typeof payload === 'string'
 			? payload
 			: payload?.message || payload?.error || 'Request failed'
-		throw new Error(message)
+		const error = new Error(message)
+		error.status = response.status
+		throw error
 	}
 
 	return payload
@@ -53,9 +57,20 @@ export async function logout() {
 	})
 }
 
+export async function deactivateSelf({ reason, token }) {
+	const query = reason ? `?reason=${encodeURIComponent(reason)}` : ''
+	return request(`/auth/deactivate${query}`, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${token}`,
+		},
+	})
+}
+
 export default {
 	login,
 	register,
 	refresh,
 	logout,
+	deactivateSelf,
 }
