@@ -19,10 +19,8 @@ type SessionStore struct {
 }
 
 // EnsureSession fetches an existing session or creates a new one for the appointment.
-// It reads the scheduled start time from appointments_stub to set session defaults.
-// This is called during the join flow — if the session doesn't exist yet, it means
-// this is the first person joining the call.
-func (s *SessionStore) EnsureSession(ctx context.Context, appointmentID string) (*model.SessionRow, error) {
+// It uses the provided AppointmentInfo for scheduling data when creating a new session.
+func (s *SessionStore) EnsureSession(ctx context.Context, appointmentID string, info *model.AppointmentInfo) (*model.SessionRow, error) {
 	row := &model.SessionRow{}
 	err := s.DB.QueryRow(ctx, `
 		SELECT appointment_id, channel_name, status, started_at, ended_at, scheduled_start,
@@ -41,15 +39,9 @@ func (s *SessionStore) EnsureSession(ctx context.Context, appointmentID string) 
 		return nil, err
 	}
 
-	// Session doesn't exist yet — create one from the appointment data
-	var scheduledStart time.Time
-	var scheduledDuration int64
-	if err := s.DB.QueryRow(ctx,
-		`SELECT scheduled_start, scheduled_duration_seconds FROM appointments_stub WHERE appointment_id=$1`,
-		appointmentID,
-	).Scan(&scheduledStart, &scheduledDuration); err != nil {
-		return nil, err
-	}
+	// Session doesn't exist yet — create one from the appointment info
+	scheduledStart := info.ScheduledStart
+	scheduledDuration := info.ScheduledDuration
 
 	// Channel name is derived from the appointment ID.
 	// Agora uses this as the "room name" for the video call.
@@ -63,7 +55,7 @@ func (s *SessionStore) EnsureSession(ctx context.Context, appointmentID string) 
 	}
 
 	// Re-read to get the full row with defaults applied by Postgres
-	return s.EnsureSession(ctx, appointmentID)
+	return s.EnsureSession(ctx, appointmentID, info)
 }
 
 // StartSession transitions the session to "in_progress" and records the start time.
@@ -131,7 +123,17 @@ func (s *SessionStore) UpdateRecording(ctx context.Context, appointmentID, objec
 // FetchStatus builds a full SessionStatusResponse by joining session data with participant presence.
 // This is used by both the status endpoint and internally after ending a session.
 func (s *SessionStore) FetchStatus(ctx context.Context, appointmentID string) (*model.SessionStatusResponse, error) {
-	session, err := s.EnsureSession(ctx, appointmentID)
+	session := &model.SessionRow{}
+	err := s.DB.QueryRow(ctx, `
+		SELECT appointment_id, channel_name, status, started_at, ended_at, scheduled_start,
+		       scheduled_duration_seconds, duration_override_seconds, no_show_notified,
+		       recording_status, recording_object_key
+		FROM sessions WHERE appointment_id=$1
+	`, appointmentID).Scan(
+		&session.AppointmentID, &session.ChannelName, &session.Status, &session.StartedAt, &session.EndedAt,
+		&session.ScheduledStart, &session.ScheduledDurationSeconds, &session.DurationOverrideSeconds,
+		&session.NoShowNotified, &session.RecordingStatus, &session.RecordingObjectKey,
+	)
 	if err != nil {
 		return nil, err
 	}

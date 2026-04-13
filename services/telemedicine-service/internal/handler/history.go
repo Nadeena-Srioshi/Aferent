@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -63,9 +64,27 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Join sessions with appointments_stub to get patient/doctor IDs.
-	// The WHERE clause uses a Go trick: ($1 = '' OR ...) means
-	// "if the parameter is empty, skip this filter".
+	var items []map[string]interface{}
+	var err error
+	if h.Config.AppointmentMode == "stub" {
+		items, err = h.historyStub(ctx, patientID, doctorID, limit, offset)
+	} else {
+		items, err = h.historyRemote(ctx, limit, offset)
+	}
+	if err != nil {
+		http.Error(w, "failed to query history", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"items":  items,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// historyStub queries sessions joined with appointments_stub (development mode).
+func (h *Handler) historyStub(ctx context.Context, patientID, doctorID string, limit, offset int) ([]map[string]interface{}, error) {
 	rows, err := h.Sessions.DB.Query(ctx, `
 		SELECT s.appointment_id, s.channel_name, s.status, s.started_at, s.ended_at,
 		       s.scheduled_duration_seconds, s.duration_override_seconds,
@@ -79,8 +98,7 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 		LIMIT $3 OFFSET $4
 	`, patientID, doctorID, limit, offset)
 	if err != nil {
-		http.Error(w, "failed to query history", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -96,23 +114,10 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 			&appointmentID, &channel, &status, &startedAt, &endedAt,
 			&scheduledDur, &override, &recordingStatus, &recKey, &pID, &dID,
 		); err != nil {
-			http.Error(w, "failed to scan history", http.StatusInternalServerError)
-			return
+			return nil, err
 		}
 
-		// Calculate call duration
-		duration := int64(0)
-		if startedAt.Valid {
-			endTime := time.Now().UTC()
-			if endedAt.Valid {
-				endTime = endedAt.Time
-			}
-			duration = int64(endTime.Sub(startedAt.Time).Seconds())
-			if duration < 0 {
-				duration = 0
-			}
-		}
-
+		duration := calcDuration(startedAt, endedAt)
 		item := map[string]interface{}{
 			"appointmentId":      appointmentID,
 			"channelName":        channel,
@@ -130,12 +135,71 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		items = append(items, item)
 	}
+	return items, nil
+}
 
-	writeJSON(w, map[string]interface{}{
-		"items":  items,
-		"limit":  limit,
-		"offset": offset,
-	})
+// historyRemote queries sessions directly without appointments_stub (remote mode).
+func (h *Handler) historyRemote(ctx context.Context, limit, offset int) ([]map[string]interface{}, error) {
+	rows, err := h.Sessions.DB.Query(ctx, `
+		SELECT appointment_id, channel_name, status, started_at, ended_at,
+		       scheduled_duration_seconds, duration_override_seconds,
+		       recording_status, recording_object_key
+		FROM sessions
+		ORDER BY COALESCE(started_at, created_at) DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var appointmentID, channel, status, recordingStatus string
+		var startedAt, endedAt sql.NullTime
+		var scheduledDur int64
+		var override sql.NullInt64
+		var recKey sql.NullString
+
+		if err := rows.Scan(
+			&appointmentID, &channel, &status, &startedAt, &endedAt,
+			&scheduledDur, &override, &recordingStatus, &recKey,
+		); err != nil {
+			return nil, err
+		}
+
+		duration := calcDuration(startedAt, endedAt)
+		item := map[string]interface{}{
+			"appointmentId":      appointmentID,
+			"channelName":        channel,
+			"status":             status,
+			"startedAt":          nullableTime(startedAt),
+			"endedAt":            nullableTime(endedAt),
+			"durationSeconds":    duration,
+			"recordingStatus":    recordingStatus,
+			"recordingObjectKey": nullableString(recKey),
+		}
+		if override.Valid {
+			item["durationOverrideSeconds"] = override.Int64
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func calcDuration(startedAt, endedAt sql.NullTime) int64 {
+	if !startedAt.Valid {
+		return 0
+	}
+	endTime := time.Now().UTC()
+	if endedAt.Valid {
+		endTime = endedAt.Time
+	}
+	d := int64(endTime.Sub(startedAt.Time).Seconds())
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 // HistoryDB returns the DB pool from the handler, used for the history query.

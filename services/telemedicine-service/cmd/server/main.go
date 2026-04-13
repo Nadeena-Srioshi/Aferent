@@ -53,7 +53,7 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to init schema")
 	}
 
-	// ── 3. Set up Kafka writer ────────────────────────────────────────
+	// ── 3. Set up Kafka writers ───────────────────────────────────────
 	kafkaWriter := &kafka.Writer{
 		Addr:                   kafka.TCP(cfg.KafkaBootstrapServers),
 		Topic:                  cfg.KafkaTopicSessionEvents,
@@ -62,6 +62,17 @@ func main() {
 		WriteTimeout:           3 * time.Second,
 	}
 	defer kafkaWriter.Close()
+
+	// Dedicated writer for the telemedicine.session.started topic.
+	// Appointment-service consumes this to save the video session link.
+	sessionStartedWriter := &kafka.Writer{
+		Addr:                   kafka.TCP(cfg.KafkaBootstrapServers),
+		Topic:                  cfg.KafkaTopicSessionStarted,
+		Balancer:               &kafka.LeastBytes{},
+		AllowAutoTopicCreation: true,
+		WriteTimeout:           3 * time.Second,
+	}
+	defer sessionStartedWriter.Close()
 
 	// ── 4. Set up Prometheus metrics ──────────────────────────────────
 	reqCtr := prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -83,13 +94,15 @@ func main() {
 		DB:                        db,
 		DefaultSessionDurationSec: cfg.DefaultSessionDurationSec,
 		Mode:                      cfg.AppointmentMode,
+		AppointmentServiceURL:     cfg.AppointmentServiceURL,
 	}
 
 	// ── 6. Build event publisher (Kafka + DB dual-write) ─────────────
 	publisher := &event.Publisher{
-		EventStore: eventStore,
-		Kafka:      kafkaWriter,
-		Log:        logger,
+		EventStore:          eventStore,
+		Kafka:               kafkaWriter,
+		SessionStartedKafka: sessionStartedWriter,
+		Log:                 logger,
 	}
 
 	// ── 7. Build Agora token builder ─────────────────────────────────

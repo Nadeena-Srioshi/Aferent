@@ -4,6 +4,19 @@ package model
 
 import "time"
 
+// AppointmentInfo holds appointment data needed by the telemedicine service.
+// In "stub" mode, this is populated from the local appointments_stub table.
+// In "remote" mode, it comes from the appointment-service HTTP API.
+type AppointmentInfo struct {
+	AppointmentID     string
+	PatientID         string
+	DoctorID          string
+	ScheduledStart    time.Time
+	ScheduledDuration int64 // seconds
+	Status            string
+	Type              string // "VIDEO" or "PHYSICAL"
+}
+
 // SessionRow maps to a row in the "sessions" table.
 // It tracks the state of a single video call tied to an appointment.
 type SessionRow struct {

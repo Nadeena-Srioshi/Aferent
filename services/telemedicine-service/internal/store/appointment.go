@@ -3,44 +3,166 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/aferent/telemedicine-service/internal/model"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// AppointmentStore handles the appointments_stub table.
-// This is a temporary local table used while appointment-service is not yet integrated.
-// Once appointment-service is live, these queries will be replaced with HTTP calls to
-// GET /appointments/{id} through the gateway at http://appointment-service:3004.
+// AppointmentStore handles appointment validation.
+// In "stub" mode it uses a local appointments_stub table.
+// In "remote" mode it calls the real appointment-service HTTP API.
 type AppointmentStore struct {
 	DB                        *pgxpool.Pool
 	DefaultSessionDurationSec int64  // from config — used when creating a stub appointment
 	Mode                      string // "stub" or "remote"
+	AppointmentServiceURL     string // base URL of appointment-service (remote mode)
 }
 
-// EnsureAppointment verifies that the appointment exists and that the actor is allowed
-// to join it. In "stub" mode, it auto-creates appointments on first use — this lets
-// the telemedicine service work without appointment-service being deployed.
-func (a *AppointmentStore) EnsureAppointment(ctx context.Context, appointmentID string, actor model.Actor) error {
-	if a.Mode != "stub" {
-		return fmt.Errorf("appointment remote mode not implemented yet")
+// appointmentAPIResponse mirrors the JSON returned by GET /appointments/{id}.
+type appointmentAPIResponse struct {
+	ID              string  `json:"id"`
+	PatientID       string  `json:"patientId"`
+	DoctorID        string  `json:"doctorId"`
+	Type            string  `json:"type"`
+	Status          string  `json:"status"`
+	AppointmentDate string  `json:"appointmentDate"` // "2025-04-07"
+	VideoSlotStart  string  `json:"videoSlotStart"`  // "14:30:00"
+	VideoSlotEnd    string  `json:"videoSlotEnd"`    // "15:00:00"
+	ConsultationFee float64 `json:"consultationFee"`
+}
+
+// EnsureAppointment verifies the appointment exists and the actor is allowed to join.
+// Returns AppointmentInfo with scheduling data needed by EnsureSession.
+func (a *AppointmentStore) EnsureAppointment(ctx context.Context, appointmentID string, actor model.Actor) (*model.AppointmentInfo, error) {
+	if a.Mode == "remote" {
+		return a.ensureRemote(ctx, appointmentID, actor)
+	}
+	return a.ensureStub(ctx, appointmentID, actor)
+}
+
+// ensureRemote validates the appointment against the real appointment-service.
+func (a *AppointmentStore) ensureRemote(ctx context.Context, appointmentID string, actor model.Actor) (*model.AppointmentInfo, error) {
+	url := strings.TrimRight(a.AppointmentServiceURL, "/") + "/appointments/" + appointmentID
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build appointment request: %w", err)
+	}
+	// Forward identity headers — appointment-service uses these for authorization
+	req.Header.Set("X-User-ID", actor.UserID)
+	req.Header.Set("X-User-Role", actor.Role)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reach appointment-service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("appointment %s not found", appointmentID)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("appointment-service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Try to find existing appointment
+	var appt appointmentAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&appt); err != nil {
+		return nil, fmt.Errorf("failed to decode appointment response: %w", err)
+	}
+
+	// Validate appointment type
+	if !strings.EqualFold(appt.Type, "VIDEO") {
+		return nil, fmt.Errorf("appointment %s is not a VIDEO appointment (type=%s)", appointmentID, appt.Type)
+	}
+
+	// Validate appointment status — only CONFIRMED appointments can start a video call
+	if !strings.EqualFold(appt.Status, "CONFIRMED") {
+		return nil, fmt.Errorf("appointment %s is not CONFIRMED (status=%s)", appointmentID, appt.Status)
+	}
+
+	// Validate the actor is part of this appointment
+	if actor.Role == "PATIENT" && appt.PatientID != actor.UserID {
+		return nil, fmt.Errorf("patient is not owner of appointment")
+	}
+	if actor.Role == "DOCTOR" && appt.DoctorID != actor.UserID {
+		return nil, fmt.Errorf("doctor is not owner of appointment")
+	}
+
+	// Parse scheduling info
+	scheduledStart, scheduledDuration := a.parseSchedule(appt)
+
+	return &model.AppointmentInfo{
+		AppointmentID:     appointmentID,
+		PatientID:         appt.PatientID,
+		DoctorID:          appt.DoctorID,
+		ScheduledStart:    scheduledStart,
+		ScheduledDuration: scheduledDuration,
+		Status:            appt.Status,
+		Type:              appt.Type,
+	}, nil
+}
+
+// parseSchedule extracts the scheduled start time and duration from the appointment response.
+func (a *AppointmentStore) parseSchedule(appt appointmentAPIResponse) (time.Time, int64) {
+	now := time.Now().UTC()
+
+	// Try to parse appointmentDate + videoSlotStart
+	if appt.AppointmentDate != "" && appt.VideoSlotStart != "" {
+		date, dateErr := time.Parse("2006-01-02", appt.AppointmentDate)
+		slotStart, timeErr := time.Parse("15:04:05", appt.VideoSlotStart)
+
+		if dateErr == nil && timeErr == nil {
+			scheduledStart := time.Date(
+				date.Year(), date.Month(), date.Day(),
+				slotStart.Hour(), slotStart.Minute(), slotStart.Second(),
+				0, time.UTC,
+			)
+
+			// Calculate duration from slot times
+			duration := a.DefaultSessionDurationSec
+			if appt.VideoSlotEnd != "" {
+				if slotEnd, err := time.Parse("15:04:05", appt.VideoSlotEnd); err == nil {
+					dur := time.Date(
+						date.Year(), date.Month(), date.Day(),
+						slotEnd.Hour(), slotEnd.Minute(), slotEnd.Second(),
+						0, time.UTC,
+					).Sub(scheduledStart)
+					if dur.Seconds() > 0 {
+						duration = int64(dur.Seconds())
+					}
+				}
+			}
+			return scheduledStart, duration
+		}
+	}
+
+	// Fallback — use current time and default duration
+	return now, a.DefaultSessionDurationSec
+}
+
+// ensureStub uses the local appointments_stub table (development/testing mode).
+func (a *AppointmentStore) ensureStub(ctx context.Context, appointmentID string, actor model.Actor) (*model.AppointmentInfo, error) {
 	var patientID, doctorID string
+	var scheduledStart time.Time
+	var scheduledDuration int64
 	err := a.DB.QueryRow(ctx,
-		`SELECT patient_id, doctor_id FROM appointments_stub WHERE appointment_id=$1`,
+		`SELECT patient_id, doctor_id, scheduled_start, scheduled_duration_seconds FROM appointments_stub WHERE appointment_id=$1`,
 		appointmentID,
-	).Scan(&patientID, &doctorID)
+	).Scan(&patientID, &doctorID, &scheduledStart, &scheduledDuration)
 
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return err
+			return nil, err
 		}
 		// Appointment doesn't exist — create a stub.
-		// The first person to join defines their role in the appointment.
 		p := ""
 		d := ""
 		if actor.Role == "PATIENT" {
@@ -49,34 +171,56 @@ func (a *AppointmentStore) EnsureAppointment(ctx context.Context, appointmentID 
 		if actor.Role == "DOCTOR" {
 			d = actor.UserID
 		}
+		now := time.Now().UTC()
 		_, err = a.DB.Exec(ctx, `
 			INSERT INTO appointments_stub (appointment_id, patient_id, doctor_id, scheduled_start, scheduled_duration_seconds)
 			VALUES ($1,$2,$3,NOW(),$4)
 		`, appointmentID, p, d, a.DefaultSessionDurationSec)
-		return err
+		if err != nil {
+			return nil, err
+		}
+		return &model.AppointmentInfo{
+			AppointmentID:     appointmentID,
+			PatientID:         p,
+			DoctorID:          d,
+			ScheduledStart:    now,
+			ScheduledDuration: a.DefaultSessionDurationSec,
+			Status:            "CONFIRMED",
+			Type:              "VIDEO",
+		}, nil
 	}
 
-	// Appointment exists — verify the actor is allowed to join it.
-	// A patient can only join their own appointment, same for doctor.
+	// Validate the actor is allowed to join
 	if actor.Role == "PATIENT" && patientID != "" && patientID != actor.UserID {
-		return fmt.Errorf("patient is not owner of appointment")
+		return nil, fmt.Errorf("patient is not owner of appointment")
 	}
 	if actor.Role == "DOCTOR" && doctorID != "" && doctorID != actor.UserID {
-		return fmt.Errorf("doctor is not owner of appointment")
+		return nil, fmt.Errorf("doctor is not owner of appointment")
 	}
 
-	// If this role's slot is empty, fill it in (second person joining)
+	// Fill in empty role slots
 	if actor.Role == "PATIENT" && patientID == "" {
 		_, _ = a.DB.Exec(ctx,
 			`UPDATE appointments_stub SET patient_id=$2, updated_at=NOW() WHERE appointment_id=$1`,
 			appointmentID, actor.UserID,
 		)
+		patientID = actor.UserID
 	}
 	if actor.Role == "DOCTOR" && doctorID == "" {
 		_, _ = a.DB.Exec(ctx,
 			`UPDATE appointments_stub SET doctor_id=$2, updated_at=NOW() WHERE appointment_id=$1`,
 			appointmentID, actor.UserID,
 		)
+		doctorID = actor.UserID
 	}
-	return nil
+
+	return &model.AppointmentInfo{
+		AppointmentID:     appointmentID,
+		PatientID:         patientID,
+		DoctorID:          doctorID,
+		ScheduledStart:    scheduledStart,
+		ScheduledDuration: scheduledDuration,
+		Status:            "CONFIRMED",
+		Type:              "VIDEO",
+	}, nil
 }

@@ -56,7 +56,7 @@ services/telemedicine-service/
 │   │   ├── schema.go            ← DDL: creates tables + indexes on startup
 │   │   ├── session.go           ← SessionStore: CRUD for sessions table
 │   │   ├── participant.go       ← ParticipantStore: join/leave tracking
-│   │   ├── appointment.go       ← AppointmentStore: stub appointment records
+│   │   ├── appointment.go       ← AppointmentStore: stub & remote appointment validation
 │   │   └── event.go             ← EventStore: append-only audit log writes
 │   ├── event/publisher.go       ← dual-write: Postgres + Kafka event emission
 │   ├── agora/token.go           ← Agora RTC token builder (dev fallback)
@@ -132,7 +132,10 @@ docker compose up --build
 | `TELEMEDICINE_DB_DSN` | `postgres://telemedicine:telemedicine@localhost:5432/telemedicine_db?sslmode=disable` | PostgreSQL connection string |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Comma-separated Kafka broker addresses |
 | `KAFKA_TOPIC_SESSION_EVENTS` | `telemedicine.events` | Kafka topic for session events |
-| `APPOINTMENT_MODE` | `stub` | `stub` = local Postgres appointments; `remote` = call appointment-service (future) |
+| `KAFKA_TOPIC_SESSION_STARTED` | `telemedicine.session.started` | Dedicated topic consumed by appointment-service to save video link |
+| `APPOINTMENT_MODE` | `stub` | `stub` = local Postgres appointments; `remote` = validate via real appointment-service |
+| `APPOINTMENT_SERVICE_URL` | `http://appointment-service:3004` | Base URL of appointment-service (used in remote mode) |
+| `SESSION_LINK_BASE_URL` | `http://localhost:8080` | Base URL for building video session links sent to appointment-service |
 | `DEFAULT_SESSION_DURATION_SEC` | `1800` | Default call duration in seconds (30 min) |
 | `WARNING_THRESHOLD_SEC` | `300` | Seconds remaining when a warning event fires |
 | `NO_SHOW_THRESHOLD_SEC` | `60` | Seconds past scheduled start before no-show detection |
@@ -511,9 +514,27 @@ The webhook endpoint is **exempt from JWT**, since Agora calls it directly with 
 
 The auth service issues JWT tokens at `POST /auth/register` and `POST /auth/login`. The telemedicine service does **not** talk to auth directly — it trusts the headers set by the gateway.
 
-### Appointment Service (planned)
+### Appointment Service (Spring Boot, port 3004)
 
-When `APPOINTMENT_MODE=remote`, the telemedicine service will call the appointment-service to validate appointments and fetch scheduling info. Currently set to `stub`, which creates local records in the `appointments_stub` table.
+When `APPOINTMENT_MODE=remote`, the telemedicine service validates appointments by calling `GET /appointments/{id}` on the appointment-service (internal Docker network). It verifies:
+
+- The appointment exists
+- Type is `VIDEO`
+- Status is `CONFIRMED` (appointment has been approved by doctor and paid for)
+- The requesting user is the patient or doctor on the appointment
+
+When a video session starts, the telemedicine service publishes to the dedicated `telemedicine.session.started` Kafka topic with a flat payload:
+
+```json
+{
+  "appointmentId": "appt-123",
+  "sessionLink": "http://localhost:8080/sessions/join/appt-123"
+}
+```
+
+The appointment-service consumes this event and saves the `sessionLink` as the `videoSessionLink` field on the appointment record.
+
+When `APPOINTMENT_MODE=stub` (default for local dev), appointments are auto-created in a local `appointments_stub` table — no dependency on appointment-service.
 
 ### Kafka Consumers (other services)
 

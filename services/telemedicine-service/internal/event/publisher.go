@@ -21,9 +21,10 @@ import (
 
 // Publisher emits structured events to Kafka and persists them in Postgres.
 type Publisher struct {
-	EventStore *store.EventStore
-	Kafka      *kafka.Writer
-	Log        zerolog.Logger
+	EventStore          *store.EventStore
+	Kafka               *kafka.Writer
+	SessionStartedKafka *kafka.Writer // dedicated writer for the telemedicine.session.started topic
+	Log                 zerolog.Logger
 }
 
 // Emit creates an EventEnvelope, writes it to the session_events table,
@@ -70,4 +71,43 @@ func (p *Publisher) Emit(ctx context.Context, correlationID, appointmentID, even
 		Str("correlationId", correlationID).
 		Msg("event published")
 	return nil
+}
+
+// EmitSessionStarted publishes a flat JSON message to the dedicated
+// telemedicine.session.started topic. The appointment-service consumes this
+// to save the video session link on the appointment record.
+//
+// The message format is intentionally flat (not wrapped in EventEnvelope)
+// because the appointment-service reads top-level fields directly:
+//
+//	{ "appointmentId": "...", "sessionLink": "..." }
+func (p *Publisher) EmitSessionStarted(ctx context.Context, appointmentID, sessionLink string) {
+	if p.SessionStartedKafka == nil {
+		return
+	}
+
+	msg := map[string]string{
+		"appointmentId": appointmentID,
+		"sessionLink":   sessionLink,
+	}
+	buf, err := json.Marshal(msg)
+	if err != nil {
+		p.Log.Warn().Err(err).Str("appointmentId", appointmentID).
+			Msg("failed to marshal session-started message")
+		return
+	}
+
+	if err := p.SessionStartedKafka.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(appointmentID),
+		Value: buf,
+	}); err != nil {
+		p.Log.Warn().Err(err).Str("appointmentId", appointmentID).
+			Msg("failed to publish to telemedicine.session.started — appointment-service won't receive session link")
+		return
+	}
+
+	p.Log.Info().
+		Str("appointmentId", appointmentID).
+		Str("sessionLink", sessionLink).
+		Msg("session-started event published to appointment-service")
 }

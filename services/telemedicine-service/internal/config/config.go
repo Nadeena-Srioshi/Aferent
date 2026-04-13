@@ -29,8 +29,19 @@ type Config struct {
 	AgoraTokenTTLSec    uint32 // token time-to-live in seconds
 
 	// Appointment mode: "stub" creates appointments locally in Postgres,
-	// "remote" would call the appointment-service (not yet implemented).
+	// "remote" calls the real appointment-service via HTTP.
 	AppointmentMode string
+
+	// AppointmentServiceURL is the base URL of the appointment-service (used in remote mode).
+	AppointmentServiceURL string
+
+	// KafkaTopicSessionStarted is the dedicated topic for session-started events
+	// consumed by appointment-service to save the video session link.
+	KafkaTopicSessionStarted string
+
+	// SessionLinkBaseURL is the base URL used to construct the video session link
+	// sent to appointment-service (e.g. "http://localhost:8080").
+	SessionLinkBaseURL string
 
 	// Session timing
 	DefaultSessionDurationSec int64 // default video call length (seconds)
@@ -51,6 +62,9 @@ func Load() Config {
 		AgoraWebhookSecret:        envOr("AGORA_WEBHOOK_SECRET", ""),
 		AgoraTokenTTLSec:          uint32(envInt("AGORA_TOKEN_TTL_SEC", 3600)),
 		AppointmentMode:           strings.ToLower(envOr("APPOINTMENT_MODE", "stub")),
+		AppointmentServiceURL:     envOr("APPOINTMENT_SERVICE_URL", "http://appointment-service:3004"),
+		KafkaTopicSessionStarted:  envOr("KAFKA_TOPIC_SESSION_STARTED", "telemedicine.session.started"),
+		SessionLinkBaseURL:        envOr("SESSION_LINK_BASE_URL", "http://localhost:8080"),
 		DefaultSessionDurationSec: int64(envInt("DEFAULT_SESSION_DURATION_SEC", 1800)),
 		ReconnectGraceSec:         int64(envInt("RECONNECT_GRACE_SEC", 90)),
 		WarningThresholdSec:       int64(envInt("WARNING_THRESHOLD_SEC", 300)),

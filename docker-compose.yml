@@ -138,7 +138,10 @@ services:
       TELEMEDICINE_DB_DSN: postgres://telemedicine:telemedicine@postgres-telemedicine:5432/telemedicine_db?sslmode=disable
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_SESSION_EVENTS: telemedicine.events
-      APPOINTMENT_MODE: stub
+      KAFKA_TOPIC_SESSION_STARTED: telemedicine.session.started
+      APPOINTMENT_MODE: remote
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3004
+      SESSION_LINK_BASE_URL: http://localhost:8080
       DEFAULT_SESSION_DURATION_SEC: 1800
       WARNING_THRESHOLD_SEC: 300
       NO_SHOW_THRESHOLD_SEC: 60

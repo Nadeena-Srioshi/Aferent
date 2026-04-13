@@ -35,6 +35,48 @@
   <p>Use this page to test the telemedicine video call API. Open on laptop and phone with the same appointment ID for a two-person call.</p>
 
   <div class="grid">
+    <!-- Auth / Mode Selection -->
+    <div class="card">
+      <h3>Connection Mode</h3>
+      <div class="row">
+        <div>
+          <label>Mode</label>
+          <select id="connMode" onchange="toggleMode()">
+            <option value="direct">Direct (port 3006, no auth)</option>
+            <option value="gateway">Gateway (port 8080, JWT auth)</option>
+          </select>
+        </div>
+        <div>
+          <label>Gateway URL</label>
+          <input id="gatewayUrl" value="http://localhost:8080" />
+        </div>
+      </div>
+      <div id="authPanel" style="margin-top:10px; display:none;">
+        <div class="row">
+          <div>
+            <label>Email</label>
+            <input id="authEmail" value="" placeholder="user@example.com" />
+          </div>
+          <div>
+            <label>Password</label>
+            <input id="authPassword" type="password" value="" />
+          </div>
+          <button id="loginBtn" style="align-self:flex-end;">Login</button>
+          <button id="registerBtn" class="secondary" style="align-self:flex-end;">Register</button>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <div>
+            <label>Register Role</label>
+            <select id="registerRole">
+              <option>PATIENT</option>
+              <option>DOCTOR</option>
+            </select>
+          </div>
+        </div>
+        <p id="authStatus" style="font-size:13px; color:#555;"></p>
+      </div>
+    </div>
+
     <!-- Session Controls -->
     <div class="card">
       <div class="row">
@@ -173,12 +215,80 @@
       btn.classList.add('active');
     }
 
-    const headers = () => ({
-      'Content-Type': 'application/json',
-      'X-User-ID': document.getElementById('userId').value,
-      'X-User-Role': document.getElementById('role').value,
-      'X-User-Email': document.getElementById('email').value,
-    });
+    let jwtToken = '', authUserId = '', authUserRole = '';
+
+    function toggleMode() {
+      const mode = document.getElementById('connMode').value;
+      document.getElementById('authPanel').style.display = mode === 'gateway' ? 'block' : 'none';
+    }
+
+    function baseUrl() {
+      return document.getElementById('connMode').value === 'gateway'
+        ? document.getElementById('gatewayUrl').value.replace(/\/$/, '')
+        : '';
+    }
+
+    const headers = () => {
+      const mode = document.getElementById('connMode').value;
+      const h = { 'Content-Type': 'application/json' };
+      if (mode === 'gateway') {
+        if (jwtToken) h['Authorization'] = 'Bearer ' + jwtToken;
+      } else {
+        h['X-User-ID'] = document.getElementById('userId').value;
+        h['X-User-Role'] = document.getElementById('role').value;
+        h['X-User-Email'] = document.getElementById('email').value;
+      }
+      return h;
+    };
+
+    async function doLogin() {
+      try {
+        const gw = document.getElementById('gatewayUrl').value.replace(/\/$/, '');
+        const res = await fetch(gw + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('authEmail').value,
+            password: document.getElementById('authPassword').value,
+          }),
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
+        const data = await res.json();
+        jwtToken = data.accessToken;
+        authUserId = data.authId;
+        authUserRole = data.role;
+        document.getElementById('authStatus').textContent = 'Logged in as ' + data.role + ' (id=' + data.authId + ')';
+        document.getElementById('userId').value = data.authId;
+        document.getElementById('role').value = data.role;
+        document.getElementById('email').value = document.getElementById('authEmail').value;
+        debug('login success', { authId: data.authId, role: data.role });
+      } catch (e) { debug('login error', { message: e.message }); }
+    }
+
+    async function doRegister() {
+      try {
+        const gw = document.getElementById('gatewayUrl').value.replace(/\/$/, '');
+        const res = await fetch(gw + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('authEmail').value,
+            password: document.getElementById('authPassword').value,
+            role: document.getElementById('registerRole').value,
+          }),
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
+        const data = await res.json();
+        jwtToken = data.accessToken;
+        authUserId = data.authId;
+        authUserRole = data.role;
+        document.getElementById('authStatus').textContent = 'Registered and logged in as ' + data.role + ' (id=' + data.authId + ')';
+        document.getElementById('userId').value = data.authId;
+        document.getElementById('role').value = data.role;
+        document.getElementById('email').value = document.getElementById('authEmail').value;
+        debug('register success', { authId: data.authId, role: data.role });
+      } catch (e) { debug('register error', { message: e.message }); }
+    }
 
     let client = null, localTracks = [], joined = false, remoteAudioMuted = false, remoteAudioElement = null;
     let playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
@@ -196,7 +306,7 @@
     async function joinSession() {
       const id = document.getElementById('appointmentId').value;
       try {
-        const res = await fetch('/sessions/join/' + id, { method: 'POST', headers: headers() });
+        const res = await fetch(baseUrl() + '/sessions/join/' + id, { method: 'POST', headers: headers() });
         if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
         const data = await res.json();
         debug('join response', data);
@@ -262,7 +372,7 @@
     async function checkStatus() {
       try {
         const id = document.getElementById('appointmentId').value;
-        const res = await fetch('/sessions/' + id + '/status', { headers: headers() });
+        const res = await fetch(baseUrl() + '/sessions/' + id + '/status', { headers: headers() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         debug('status', data);
@@ -273,7 +383,7 @@
     async function checkRemaining() {
       try {
         const id = document.getElementById('appointmentId').value;
-        const res = await fetch('/sessions/' + id + '/remaining-duration', { headers: headers() });
+        const res = await fetch(baseUrl() + '/sessions/' + id + '/remaining-duration', { headers: headers() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         debug('remaining', await res.json());
       } catch (e) { debug('remaining error', { message: e.message }); }
@@ -282,7 +392,7 @@
     async function endSession() {
       try {
         const id = document.getElementById('appointmentId').value;
-        const res = await fetch('/sessions/' + id + '/end', { method: 'POST', headers: headers() });
+        const res = await fetch(baseUrl() + '/sessions/' + id + '/end', { method: 'POST', headers: headers() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         debug('end', await res.json());
         await leaveChannel();
@@ -301,7 +411,7 @@
       try {
         const id = document.getElementById('appointmentId').value;
         const body = { durationSeconds: parseInt(document.getElementById('newDuration').value, 10), reason: document.getElementById('durationReason').value };
-        const res = await fetch('/sessions/' + id + '/duration', { method: 'PATCH', headers: headers(), body: JSON.stringify(body) });
+        const res = await fetch(baseUrl() + '/sessions/' + id + '/duration', { method: 'PATCH', headers: headers(), body: JSON.stringify(body) });
         if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
         debug('duration updated', await res.json());
       } catch (e) { debug('duration error', { message: e.message }); }
@@ -314,7 +424,7 @@
         const did = document.getElementById('histDoctorId').value.trim();
         if (pid) params.set('patientId', pid);
         if (did) params.set('doctorId', did);
-        const res = await fetch('/sessions/history?' + params, { headers: headers() });
+        const res = await fetch(baseUrl() + '/sessions/history?' + params, { headers: headers() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         debug('history', { count: data.items.length });
@@ -335,12 +445,14 @@
           userId: document.getElementById('webhookUserId').value,
           role: document.getElementById('webhookRole').value,
         };
-        const res = await fetch('/sessions/webhooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await fetch(baseUrl() + '/sessions/webhooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
         debug('webhook sent', await res.json());
       } catch (e) { debug('webhook error', { message: e.message }); }
     }
 
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    document.getElementById('registerBtn').addEventListener('click', doRegister);
     document.getElementById('joinBtn').addEventListener('click', joinSession);
     document.getElementById('statusBtn').addEventListener('click', checkStatus);
     document.getElementById('remainingBtn').addEventListener('click', checkRemaining);

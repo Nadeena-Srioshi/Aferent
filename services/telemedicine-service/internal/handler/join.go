@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -63,14 +64,15 @@ func (h *Handler) HandleJoin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cid := middleware.GetCorrelationID(ctx)
 
-	// Step 2: ensure the appointment exists
-	if err := h.Appointments.EnsureAppointment(ctx, appointmentID, actor); err != nil {
+	// Step 2: ensure the appointment exists and get scheduling data
+	apptInfo, err := h.Appointments.EnsureAppointment(ctx, appointmentID, actor)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Step 3: ensure the session record exists
-	session, err := h.Sessions.EnsureSession(ctx, appointmentID)
+	session, err := h.Sessions.EnsureSession(ctx, appointmentID, apptInfo)
 	if err != nil {
 		h.logErr(r, err, "failed to ensure session")
 		http.Error(w, "failed to create session", http.StatusInternalServerError)
@@ -95,6 +97,12 @@ func (h *Handler) HandleJoin(w http.ResponseWriter, r *http.Request) {
 			"joinedBy":  actor.Role,
 			"userId":    actor.UserID,
 		})
+
+		// Publish to the dedicated telemedicine.session.started topic
+		// so appointment-service can save the video session link.
+		sessionLink := fmt.Sprintf("%s/sessions/join/%s",
+			strings.TrimRight(h.Config.SessionLinkBaseURL, "/"), appointmentID)
+		h.Publisher.EmitSessionStarted(ctx, appointmentID, sessionLink)
 	}
 
 	// Step 6: check if the counterpart is already in the call
