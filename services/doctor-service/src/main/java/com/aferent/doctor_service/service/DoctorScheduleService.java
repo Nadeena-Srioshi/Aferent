@@ -9,6 +9,7 @@ import com.aferent.doctor_service.model.ScheduleOverride;
 import com.aferent.doctor_service.model.WeeklySchedule;
 import com.aferent.doctor_service.model.WeeklySchedule.DaySchedule;
 import com.aferent.doctor_service.repository.DoctorRepository;
+import com.aferent.doctor_service.repository.HospitalRepository;
 import com.aferent.doctor_service.repository.ScheduleOverrideRepository;
 import com.aferent.doctor_service.repository.WeeklyScheduleRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,14 +30,16 @@ public class DoctorScheduleService {
     private final WeeklyScheduleRepository weeklyScheduleRepository;
     private final ScheduleOverrideRepository scheduleOverrideRepository;
     private final DoctorRepository doctorRepository;
+    private final HospitalRepository hospitalRepository;
 
-    // ───────────────── WEEKLY SCHEDULE ─────────────────
+    // weekly schedule   ********
 
     public WeeklySchedule setWeeklySchedule(String doctorId, String authId,
                                             WeeklyScheduleRequest request) {
 
-        validateOwnership(doctorId, authId);
-        validateAllDays(request);
+        Doctor doctor = validateOwnership(doctorId, authId);
+
+        validateAllDays(request, doctor);
 
         WeeklySchedule schedule = weeklyScheduleRepository.findByDoctorId(doctorId)
                 .orElse(WeeklySchedule.builder().doctorId(doctorId).build());
@@ -49,7 +52,10 @@ public class DoctorScheduleService {
         schedule.setSaturday(assignSessionIds(request.getSaturday()));
         schedule.setSunday(assignSessionIds(request.getSunday()));
 
-        return weeklyScheduleRepository.save(schedule);
+        WeeklySchedule saved = weeklyScheduleRepository.save(schedule);
+        log.info("Weekly schedule saved for doctorId={}", doctorId);
+
+        return saved;
     }
 
     public WeeklySchedule getWeeklySchedule(String doctorId) {
@@ -57,12 +63,12 @@ public class DoctorScheduleService {
                 .orElseThrow(() -> new ResourceNotFoundException("No schedule found"));
     }
 
-    // ───────────────── OVERRIDES ─────────────────
+    // overrides    ********
 
     public ScheduleOverride addOverride(String doctorId, String authId,
                                         ScheduleOverrideRequest request) {
 
-        validateOwnership(doctorId, authId);
+        Doctor doctor = validateOwnership(doctorId, authId);
 
         if (request.getDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("Cannot modify past dates");
@@ -74,7 +80,7 @@ public class DoctorScheduleService {
                 if (request.getSlots() == null || request.getSlots().isEmpty()) {
                     throw new IllegalArgumentException("Slots required for ADD");
                 }
-                validateSlotList(request.getSlots());
+                validateSlotList(request.getSlots(), doctor);
             }
 
             case CANCEL_SESSION -> {
@@ -108,7 +114,11 @@ public class DoctorScheduleService {
             override.setSessionId(null);
         }
 
-        return scheduleOverrideRepository.save(override);
+        ScheduleOverride saved = scheduleOverrideRepository.save(override);
+        log.info("Override saved doctorId={} date={} action={}",
+                doctorId, request.getDate(), request.getAction());
+
+        return saved;
     }
 
     public List<ScheduleOverride> getUpcomingOverrides(String doctorId) {
@@ -128,38 +138,43 @@ public class DoctorScheduleService {
         }
 
         scheduleOverrideRepository.deleteById(overrideId);
+        log.info("Override deleted overrideId={} doctorId={}", overrideId, doctorId);
     }
 
-    // ───────────────── VALIDATIONS ─────────────────
+    // validations    *********
 
-    private void validateAllDays(WeeklyScheduleRequest request) {
-        validateSlotList(request.getMonday());
-        validateSlotList(request.getTuesday());
-        validateSlotList(request.getWednesday());
-        validateSlotList(request.getThursday());
-        validateSlotList(request.getFriday());
-        validateSlotList(request.getSaturday());
-        validateSlotList(request.getSunday());
+    private void validateAllDays(WeeklyScheduleRequest request, Doctor doctor) {
+        validateSlotList(request.getMonday(), doctor);
+        validateSlotList(request.getTuesday(), doctor);
+        validateSlotList(request.getWednesday(), doctor);
+        validateSlotList(request.getThursday(), doctor);
+        validateSlotList(request.getFriday(), doctor);
+        validateSlotList(request.getSaturday(), doctor);
+        validateSlotList(request.getSunday(), doctor);
     }
 
-    private void validateSlotList(List<DaySchedule> slots) {
+    private void validateSlotList(List<DaySchedule> slots, Doctor doctor) {
         if (slots == null || slots.isEmpty()) return;
 
         for (DaySchedule slot : slots) {
-            validateSingleSlot(slot);
+            validateSingleSlot(slot, doctor);
         }
 
         // overlap check
         for (int i = 0; i < slots.size(); i++) {
             for (int j = i + 1; j < slots.size(); j++) {
                 if (isOverlap(slots.get(i), slots.get(j))) {
-                    throw new IllegalArgumentException("Overlapping sessions detected");
+                    throw new IllegalArgumentException(
+                            "Time slots overlap: "
+                                    + slots.get(i).getStartTime() + "-" + slots.get(i).getEndTime()
+                                    + " overlaps with "
+                                    + slots.get(j).getStartTime() + "-" + slots.get(j).getEndTime());
                 }
             }
         }
     }
 
-    private void validateSingleSlot(DaySchedule slot) {
+    private void validateSingleSlot(DaySchedule slot, Doctor doctor) {
 
         if (slot.getStartTime() == null || slot.getEndTime() == null) {
             throw new IllegalArgumentException("Time required");
@@ -176,21 +191,36 @@ public class DoctorScheduleService {
         }
 
         if (!start.isBefore(end)) {
-            throw new IllegalArgumentException("startTime must be before endTime");
+            throw new IllegalArgumentException(
+                    "startTime must be before endTime: "
+                            + slot.getStartTime() + " is not before " + slot.getEndTime());
         }
 
         if (slot.getType() == null) {
             throw new IllegalArgumentException("Session type required");
         }
 
-        if (slot.getType() == DaySchedule.SessionType.IN_PERSON &&
-                (slot.getHospital() == null || slot.getHospital().isBlank())) {
-            throw new IllegalArgumentException("Hospital required for IN_PERSON");
+        // IN_PERSON validation
+        if (slot.getType() == DaySchedule.SessionType.IN_PERSON) {
+
+            if (slot.getHospital() == null || slot.getHospital().isBlank()) {
+                throw new IllegalArgumentException("Hospital required for IN_PERSON");
+            }
+
+            if (!hospitalRepository.existsById(slot.getHospital())) {
+                throw new IllegalArgumentException("Invalid hospitalId: " + slot.getHospital());
+            }
+
+            if (doctor.getHospitals() == null ||
+                    !doctor.getHospitals().contains(slot.getHospital())) {
+                throw new IllegalArgumentException(
+                        "Hospital " + slot.getHospital() + " is not assigned to this doctor");
+            }
         }
 
-        if (slot.getType() == DaySchedule.SessionType.VIDEO &&
-                slot.getHospital() != null) {
-            throw new IllegalArgumentException("VIDEO session cannot have hospital");
+        // VIDEO validation
+        if (slot.getType() == DaySchedule.SessionType.VIDEO) {
+            slot.setHospital(null); // auto-clean
         }
     }
 
@@ -210,11 +240,16 @@ public class DoctorScheduleService {
 
         List<DaySchedule> slots = getSlotsByDay(schedule, date);
 
-        boolean exists = slots != null &&
-                slots.stream().anyMatch(s -> sessionId.equals(s.getSessionId()));
+        if (slots == null || slots.isEmpty()) {
+            throw new IllegalArgumentException("No sessions for " + date.getDayOfWeek());
+        }
+
+        boolean exists = slots.stream()
+                .anyMatch(s -> sessionId.equals(s.getSessionId()));
 
         if (!exists) {
-            throw new ResourceNotFoundException("Session not found");
+            throw new ResourceNotFoundException(
+                    "Session not found for " + date.getDayOfWeek());
         }
     }
 
@@ -242,19 +277,24 @@ public class DoctorScheduleService {
         return slots;
     }
 
-    // ───────────────── SECURITY ─────────────────
+    // security    *******
 
-    private void validateOwnership(String doctorId, String authId) {
+    private Doctor validateOwnership(String doctorId, String authId) {
 
         Doctor doctor = doctorRepository.findByDoctorId(doctorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found: " + doctorId));
 
         if (!doctor.getAuthId().equals(authId)) {
-            throw new ForbiddenOperationException("Unauthorized");
+            throw new ForbiddenOperationException(
+                    "You can only manage your own schedule");
         }
 
         if (doctor.getStatus() != Doctor.RegistrationStatus.ACTIVE) {
-            throw new ForbiddenOperationException("Doctor not active");
+            throw new ForbiddenOperationException(
+                    "Account not active. Current status: " + doctor.getStatus());
         }
+
+        return doctor;
     }
 }

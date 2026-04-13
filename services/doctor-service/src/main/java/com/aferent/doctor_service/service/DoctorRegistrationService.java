@@ -5,6 +5,7 @@ import com.aferent.doctor_service.exception.ForbiddenOperationException;
 import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.repository.DoctorRepository;
+import com.aferent.doctor_service.repository.SpecializationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 public class DoctorRegistrationService {
 
     private final DoctorRepository doctorRepository;
+    private final SpecializationRepository specializationRepository;
 
     public void createPendingProfile(String authId, String email) {
         if (doctorRepository.findByAuthId(authId).isPresent()) {
@@ -48,6 +50,12 @@ public class DoctorRegistrationService {
         if (doctorRepository.existsByLicenseNumber(request.getLicenseNumber())) {
             throw new IllegalArgumentException(
                     "License number already registered: " + request.getLicenseNumber());
+        }
+
+        // validate specialization ID exists in master collection
+        if (!specializationRepository.existsById(request.getSpecialization())) {
+            throw new IllegalArgumentException(
+                    "Invalid specialization. Select from the specializations list.");
         }
 
         doctor.setFirstName(request.getFirstName());
