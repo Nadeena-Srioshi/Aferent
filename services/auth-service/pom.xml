@@ -13,7 +13,7 @@
 	<artifactId>auth-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>auth-service</name>
-	<description>Auth Service for Healthcare Platform</description>
+	<description>Auth Service for Aferent Platform</description>
 
 	<properties>
 		<java.version>21</java.version>
@@ -81,6 +81,12 @@
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
+		</dependency>
+
+		<!-- Kafka — publish user.registered events -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
 		</dependency>
 
 		<!-- Test — only ONE correct one -->
