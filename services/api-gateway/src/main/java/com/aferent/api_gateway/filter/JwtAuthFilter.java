@@ -37,7 +37,9 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/actuator",
             "/doctors/register/profile",
             "/doctors/register/license-upload-url",
-            "/doctors/register/license-confirm"
+            "/doctors/register/license-confirm",
+            "/hospitals",
+            "/specializations"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -49,13 +51,20 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
+        String method = exchange.getRequest().getMethod().name();
 
-        // Check if this path is public — skip JWT if so
+        // allow GET /doctors/** without token — public profile viewing
+        // but POST/PUT/PATCH/DELETE on /doctors/** still require token
+        if (path.startsWith("/doctors") && "GET".equals(method)) {
+            return chain.filter(exchange);
+        }
+
+        // check hardcoded public paths
         boolean isPublic = publicPaths.stream()
                 .anyMatch(p -> path.startsWith(p) || pathMatcher.match(p + "/**", path));
 
         if (isPublic) {
-            return chain.filter(exchange);   // just forward, no JWT check
+            return chain.filter(exchange);
         }
 
         // Get the Authorization header
@@ -67,24 +76,21 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
 
-        String token = authHeader.substring(7);   // strip "Bearer " prefix
+        String token = authHeader.substring(7);
 
         try {
-            // Validate and decode the JWT
             Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
 
-            // Strip the JWT and inject plain headers instead
-            // Downstream services read these — they never see the raw JWT
             ServerHttpRequest mutatedRequest = exchange.getRequest()
                     .mutate()
                     .header("X-User-ID", claims.getSubject())
                     .header("X-User-Role", claims.get("role", String.class))
                     .header("X-User-Email", claims.get("email", String.class))
-                    .header("Authorization", "")   // strip the JWT
+                    .header("Authorization", "")
                     .build();
 
             log.info("Authenticated userId={} role={} path={}",
@@ -100,7 +106,6 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
     }
-
     @Override
     public int getOrder() {
         return -1;   // runs after CorrelationIdFilter

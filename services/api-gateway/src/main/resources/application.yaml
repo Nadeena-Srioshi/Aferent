@@ -26,7 +26,7 @@ spring:
         - id: doctor-service
           uri: http://doctor-service:3003
           predicates:
-            - Path=/doctors/**, /admin/doctors/**
+            - Path=/doctors/**, /admin/doctors/**,/admin/hospitals/**, /admin/specializations/**, /hospitals/**, /specializations/**
 
         # APPOINTMENT SERVICE
         - id: appointment-service
@@ -72,6 +72,9 @@ app:
     - /doctors/register/profile
     - /doctors/register/license-upload-url
     - /doctors/register/license-confirm
+    - /hospitals/**
+    - /specializations/**
+    - /doctors/**
 
 logging:
   pattern:
