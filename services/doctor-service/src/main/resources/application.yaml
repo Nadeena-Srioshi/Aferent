@@ -35,3 +35,14 @@ minio:
 logging:
   pattern:
     console: "%d{HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
