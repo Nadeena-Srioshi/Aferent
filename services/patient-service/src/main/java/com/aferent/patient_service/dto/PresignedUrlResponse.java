@@ -11,7 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PresignedUrlResponse {
     private String uploadUrl;      // client PUTs file directly to this URL
-    private String documentId;     // client sends this back after upload completes
-    private String minioKey;       // path inside MinIO
-    private int expirySeconds;     // how long the URL is valid
+    private String permanentUrl;   // present for public objects only
 }

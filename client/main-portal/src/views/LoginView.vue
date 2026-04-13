@@ -1,74 +1,107 @@
 <template>
-  <div class="min-h-screen bg-surface flex items-center justify-center px-4 py-12">
-    <div class="w-full max-w-md">
+  <div class="bg-surface flex">
+    <div class="w-full flex overflow-hidden">
 
-      <!-- Logo -->
-      <RouterLink to="/" class="flex items-center justify-center gap-2 mb-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg">
-        <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-          <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-            <path d="M9 2C5.13 2 2 5.13 2 9s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7zm0 3a2 2 0 110 4 2 2 0 010-4zm0 9.2a5.01 5.01 0 01-4.2-2.28C4.81 10.34 7.27 9.8 9 9.8c1.72 0 4.18.54 4.2 2.12A5.01 5.01 0 019 14.2z" fill="white"/>
-          </svg>
+      <!-- Left panel -->
+      <div class="hidden md:flex w-5/12 flex-col justify-between p-12 relative overflow-hidden"
+           style="background: #004D51;">
+        <!-- Blobs -->
+        <div class="absolute -top-14 -right-16 w-56 h-56 rounded-full opacity-20 bg-action"></div>
+        <div class="absolute -right-10 bottom-16 w-36 h-36 rounded-full opacity-25 bg-primary"></div>
+
+        <!-- Logo -->
+        <RouterLink to="/" class="flex items-center gap-2 relative z-10">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,0.15);">
+            <HeartPulse class="w-4 h-4 text-white" aria-hidden="true" />
+          </div>
+          <span class="text-lg font-medium text-white tracking-tight">Aferent</span>
+        </RouterLink>
+
+        <!-- Illustration -->
+        <LoginIllustration />
+
+        <!-- Tagline -->
+        <div class="relative z-10">
+          <h2 class="text-xl font-medium text-white leading-snug mb-2">Care that fits your life.</h2>
+          <p class="text-xs leading-relaxed" style="color:rgba(255,255,255,0.55);">
+            Book appointments, consult doctors, and manage your health.
+          </p>
         </div>
-        <span class="text-2xl font-bold text-primary tracking-tight">Aferent</span>
-      </RouterLink>
+      </div>
 
-      <!-- Card -->
-      <div class="bg-card border border-border rounded-2xl shadow-sm p-8">
-        <h1 class="text-2xl font-bold text-ink mb-1">Welcome back</h1>
-        <p class="text-muted text-sm mb-7">Sign in to your patient account</p>
+      <!-- Right panel -->
+      <div class="flex-1 bg-white flex items-center justify-center p-10">
+        <div class="w-full max-w-xs">
 
-        <!-- TODO: Wire up useAuth().login() on submit -->
-        <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
-          <div>
-            <label for="email" class="block text-sm font-medium text-ink mb-1.5">Email</label>
-            <input
-              id="email"
-              v-model="form.email"
-              type="email"
-              autocomplete="email"
-              placeholder="you@example.com"
-              required
-              class="w-full px-4 py-3 rounded-xl border border-border bg-white text-ink placeholder-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-            />
+          <div class="mb-6">
+            <h1 class="text-xl font-medium text-gray-900 mb-1">Welcome back</h1>
+            <p class="text-sm text-gray-400">Sign in to your patient account</p>
           </div>
 
-          <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label for="password" class="block text-sm font-medium text-ink">Password</label>
-              <RouterLink to="/forgot-password" class="text-xs text-primary hover:text-action focus-visible:outline-none focus-visible:underline">
-                Forgot password?
-              </RouterLink>
+          <form novalidate @submit.prevent="handleSubmit" class="space-y-4">
+            <div>
+              <label for="email" class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-1.5">Email</label>
+              <input
+                id="email"
+                v-model="form.email"
+                type="email"
+                autocomplete="email"
+                placeholder="you@example.com"
+                required
+                class="w-full px-4 py-2.5 rounded-xl border text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 transition-colors"
+                style="border-color:#e0e0e0; background:#f8f8f8; --tw-ring-color:rgba(0,96,100,0.15);"
+              />
             </div>
-            <input
-              id="password"
-              v-model="form.password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              required
-              class="w-full px-4 py-3 rounded-xl border border-border bg-white text-ink placeholder-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-            />
-          </div>
 
-          <!-- TODO: show auth.error here if login fails -->
-          <p v-if="error" role="alert" class="text-xs text-danger bg-danger/10 px-4 py-2 rounded-xl">{{ error }}</p>
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label for="password" class="block text-xs font-medium uppercase tracking-wide text-gray-400">Password</label>
+                <RouterLink to="/forgot-password" class="text-xs font-medium text-primary">Forgot password?</RouterLink>
+              </div>
+              <input
+                id="password"
+                v-model="form.password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="••••••••"
+                required
+                class="w-full px-4 py-2.5 rounded-xl border text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 transition-colors"
+                style="border-color:#e0e0e0; background:#f8f8f8; --tw-ring-color:rgba(0,96,100,0.15);"
+              />
+            </div>
+
+            <p v-if="error" role="alert" class="text-xs px-4 py-2.5 rounded-xl bg-red-50 text-red-500">{{ error }}</p>
+
+            <button
+              type="submit"
+              :disabled="loading"
+              class="w-full py-3 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-primary hover:bg-action"
+            >
+              <span v-if="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>
+              {{ loading ? 'Signing in…' : 'Sign in' }}
+            </button>
+          </form>
+
+          <div class="flex items-center gap-3 my-5">
+            <hr class="flex-1 border-t border-gray-100" />
+            <span class="text-xs text-gray-300">or continue with</span>
+            <hr class="flex-1 border-t border-gray-100" />
+          </div>
 
           <button
-            type="submit"
-            :disabled="loading"
-            class="w-full py-3.5 bg-primary text-white font-semibold rounded-xl hover:bg-action transition-colors duration-150 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            class="w-full py-2.5 flex items-center justify-center gap-2 text-sm text-gray-600 rounded-xl border transition-colors hover:bg-gray-50"
+            style="border-color:#e0e0e0; background:#f8f8f8;"
           >
-            <span v-if="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle" aria-hidden="true"></span>
-            {{ loading ? 'Signing in…' : 'Sign In' }}
+            <Chrome class="w-4 h-4 text-muted" aria-hidden="true" />
+            Sign in with Google
           </button>
-        </form>
 
-        <p class="mt-6 text-center text-sm text-muted">
-          Don't have an account?
-          <RouterLink to="/register" class="text-primary font-semibold hover:text-action focus-visible:outline-none focus-visible:underline">
-            Create one free
-          </RouterLink>
-        </p>
+          <p class="mt-5 text-center text-xs text-gray-400">
+            Don't have an account?
+            <RouterLink to="/register" class="font-semibold text-primary">Create one free</RouterLink>
+          </p>
+
+        </div>
       </div>
 
     </div>
@@ -80,6 +113,8 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import { useAuth } from '@/stores/useAuth'
+import LoginIllustration from '@/components/sections/LoginIllustration.vue'
+import { Chrome, HeartPulse } from 'lucide-vue-next'
 
 const form    = reactive({ email: '', password: '' })
 const loading = ref(false)

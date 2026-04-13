@@ -4,7 +4,9 @@ import com.aferent.patient_service.dto.*;
 import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.model.Patient;
 import com.aferent.patient_service.model.PatientDocument;
+import com.aferent.patient_service.model.PatientDocumentType;
 import com.aferent.patient_service.service.PatientService;
+import com.aferent.patient_service.service.PatientDocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class PatientController {
 
     private final PatientService patientService;
+    private final PatientDocumentService patientDocumentService;
 
     // gateway injects X-User-ID header — contains the authId from auth-service
     // {id} in URL is the patientId (e.g., PAT_001)
@@ -40,6 +43,18 @@ public class PatientController {
         return ResponseEntity.ok(patient);
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<Patient> getCurrentProfile(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"PATIENT".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        return ResponseEntity.ok(patientService.getProfileByAuthId(authId));
+    }
+
     @PutMapping("/{patientId}")
     public ResponseEntity<Patient> updateProfile(
             @PathVariable String patientId,
@@ -55,16 +70,37 @@ public class PatientController {
             @PathVariable String patientId,
             @RequestHeader("X-User-ID") String authId,
             @RequestParam String fileName,
-            @RequestParam String contentType
+            @RequestParam String contentType,
+            @RequestParam(required = false) String documentType
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (!patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(
-                patientService.generateUploadUrl(patientId, fileName, contentType)
+                patientDocumentService.generateUploadUrl(patientId, fileName, contentType, PatientDocumentType.fromString(documentType))
         );
     }
+
+        // Preferred frontend route — derives patient identity from JWT (X-User-ID)
+        @PostMapping("/me/documents/upload-url")
+        public ResponseEntity<PresignedUrlResponse> getUploadUrlForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestParam String fileName,
+            @RequestParam String contentType,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String displayName
+        ) {
+        return ResponseEntity.ok(
+            patientDocumentService.generateUploadUrlForCurrentUser(
+                authId,
+                fileName,
+                contentType,
+                PatientDocumentType.fromString(documentType),
+                displayName
+            )
+        );
+        }
 
     // Step 2 — confirm upload completed, save metadata
     @PostMapping("/{patientId}/documents")
@@ -77,7 +113,17 @@ public class PatientController {
         if (!patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        return ResponseEntity.ok(patientService.saveDocumentMetadata(patientId, request));
+        return ResponseEntity.ok(patientDocumentService.saveDocumentMetadata(patientId, request));
+    }
+
+    // Optional fallback completion route for frontend recovery flows
+    @PostMapping("/me/documents")
+    public ResponseEntity<PatientDocument> saveDocumentForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestBody DocumentMetadataRequest request
+    ) {
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
+        return ResponseEntity.ok(patientDocumentService.saveDocumentMetadata(patientId, request));
     }
 
     // list documents — returns metadata only (no file content)
@@ -85,13 +131,23 @@ public class PatientController {
     public ResponseEntity<List<PatientDocument>> getDocuments(
             @PathVariable String patientId,
             @RequestHeader("X-User-ID") String authId,
-            @RequestHeader("X-User-Role") String role
+            @RequestHeader("X-User-Role") String role,
+            @RequestParam(required = false) String documentType
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        return ResponseEntity.ok(patientService.getDocuments(patientId));
+        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
+    }
+
+    @GetMapping("/me/documents")
+    public ResponseEntity<List<PatientDocument>> getDocumentsForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestParam(required = false) String documentType
+    ) {
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
+        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
     }
 
     // get a presigned download URL for a specific document
@@ -106,7 +162,16 @@ public class PatientController {
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        String url = patientService.getDocumentDownloadUrl(patientId, documentId);
+        String url = patientDocumentService.getDocumentDownloadUrl(patientId, documentId);
+        return ResponseEntity.ok(Map.of("downloadUrl", url));
+    }
+
+    @GetMapping("/me/documents/{documentId}/download-url")
+    public ResponseEntity<Map<String, String>> getDownloadUrlForCurrentUser(
+            @PathVariable String documentId,
+            @RequestHeader("X-User-ID") String authId
+    ) {
+        String url = patientDocumentService.getDocumentDownloadUrlForCurrentUser(authId, documentId);
         return ResponseEntity.ok(Map.of("downloadUrl", url));
     }
 
@@ -120,7 +185,7 @@ public class PatientController {
         if (!patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        patientService.deleteDocument(patientId, documentId);
+        patientDocumentService.deleteDocument(patientId, documentId);
         return ResponseEntity.noContent().build();
     }
 }

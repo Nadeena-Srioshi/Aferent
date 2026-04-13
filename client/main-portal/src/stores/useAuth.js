@@ -79,8 +79,10 @@ export const useAuth = defineStore('auth', {
 
       if (this.token) {
         localStorage.setItem(TOKEN_STORAGE_KEY, this.token)
+        localStorage.setItem('accessToken', this.token) // legacy compatibility for older views
       } else {
         localStorage.removeItem(TOKEN_STORAGE_KEY)
+        localStorage.removeItem('accessToken')
       }
 
       if (this.user) {
