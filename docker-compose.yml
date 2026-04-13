@@ -83,6 +83,106 @@ services:
     volumes:
       - ./logs/api-gateway:/app/logs
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    networks: [aferent-network]
+    ports:
+      - "9000:9000"    # API port — presigned URLs point here
+      - "9001:9001"    # MinIO web console — visit localhost:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_REGION: ${MINIO_REGION}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  patient-service:
+    build:
+      context: ./services/patient-service
+    container_name: patient-service
+    networks: [aferent-network]
+    ports:
+      - "3002:3002"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      MONGO_URI: ${MONGO_URI_PATIENT_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET_PATIENT}
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: notification-service
+    networks: [aferent-network]
+    ports:
+      - "3007:3007"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      MONGO_URI: ${MONGO_URI_NOTIFICATION_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      # SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      # SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL}
+      # SENDGRID_FROM_NAME: ${SENDGRID_FROM_NAME}
+      RESEND_API_KEY: ${RESEND_API_KEY} 
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME}
+    volumes:
+      - ./logs/notification-service:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3007/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+    container_name: appointment-service
+    networks: [aferent-network]
+    ports:
+      - "3004:3004"
+    environment:
+      MONGO_URI: ${MONGO_URI_APPOINTMENT_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SERVER_PORT: 3004
+      DOCTOR_SERVICE_URL: http://doctor-service:3003
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: payment-service
+    networks: [aferent-network]
+    ports:
+      - "3005:3005"
+    environment:
+      MONGO_URI: ${MONGO_URI_PAYMENT_SERVICE}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      kafka:
+        condition: service_healthy
+
 networks:
   aferent-network:
     driver: bridge
@@ -90,3 +190,4 @@ networks:
 volumes:
   mongo-data:
   kafka-data:
+  minio-data:
