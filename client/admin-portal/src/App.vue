@@ -1,18 +1,11 @@
+<script setup lang="ts"></script>
+
 <template>
-  <router-view />
+  <h1>You did it!</h1>
+  <p>
+    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
+    documentation
+  </p>
 </template>
 
-<script setup lang="ts">
-import { onMounted } from 'vue'
-import { useThemeStore } from '@/stores/theme'
-
-const themeStore = useThemeStore()
-
-onMounted(() => {
-  themeStore.initTheme()
-})
-</script>
-
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-</style>
+<style scoped></style>
