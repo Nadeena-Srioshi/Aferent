@@ -10,9 +10,10 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
       meta: { public: true },
     },
+    //change for login change 
     {
       path: '/',
-      redirect: '/dashboard',
+      redirect: '/login',
     },
     // {
     //   path: '/dashboard',
@@ -49,10 +50,11 @@ const router = createRouter({
     //   name: 'notifications',
     //   component: () => import('@/views/NotificationsView.vue'),
     // },
+    //change for login change
     {
       // catch-all — redirect anything unknown to dashboard
       path: '/:pathMatch(.*)*',
-      redirect: '/dashboard',
+      redirect: '/login',
     },
   ],
 })
