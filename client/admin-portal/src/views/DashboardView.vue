@@ -61,7 +61,7 @@ async function loadDashboard() {
     // Parallel fetches
     const [patientsRes, doctorsRes, appointmentsRes, paymentsRes] = await Promise.allSettled([
       api.get('/patients'),
-      api.get('/doctors'),
+      api.get('http://localhost:8080/doctors'),
       api.get('/appointments'),
       api.get('/payments'),
     ])

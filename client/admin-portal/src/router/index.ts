@@ -34,11 +34,11 @@ const router = createRouter({
           name: 'patient-detail',
           component: () => import('@/views/PatientDetailView.vue'),
         },
-        // {
-        //   path: 'doctors',
-        //   name: 'doctors',
-        //   component: () => import('@/views/DoctorsView.vue'),
-        // },
+        {
+          path: 'doctors',
+          name: 'doctors',
+          component: () => import('@/views/DoctorsView.vue'),
+        },
         // {
         //   path: 'appointments',
         //   name: 'appointments',
