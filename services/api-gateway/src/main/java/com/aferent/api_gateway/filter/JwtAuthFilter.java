@@ -60,6 +60,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         boolean isPublicGet = "GET".equals(method) && (
                 path.equals("/doctors") ||
                 path.matches("/doctors/DOC_[^/]+") ||
+                path.matches("/doctors/DOC_[^/]+/schedule/weekly") ||
+                path.matches("/doctors/DOC_[^/]+/schedule/overrides") ||
                 path.matches("/doctors/DOC_[^/]+/profile/pic-url")
         );
 
