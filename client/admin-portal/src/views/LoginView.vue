@@ -51,8 +51,8 @@ async function handleLogin() {
       role: data.role,
       authId: data.authId,
     })
-
-    router.push('/dashboard')
+    console.log('Login successful, redirecting to dashboard...')
+    //router.push('/dashboard')
   } catch (err: any) {
     const msg = err.response?.data?.message || err.response?.data || ''
     if (err.response?.status === 401 || err.response?.status === 400) {
