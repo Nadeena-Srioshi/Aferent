@@ -157,6 +157,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
+      PRESCRIPTION_BASE_URL: http://localhost:8080
     volumes:
       - ./logs/doctor-service:/app/logs
     healthcheck:
@@ -223,6 +224,7 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI_PAYMENT_SERVICE}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092 
     depends_on:
       kafka:
         condition: service_healthy
