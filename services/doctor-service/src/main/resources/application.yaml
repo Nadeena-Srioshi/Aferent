@@ -46,3 +46,6 @@ management:
       probes:
         enabled: true
       show-details: always
+
+app:
+  prescription-base-url: ${PRESCRIPTION_BASE_URL:http://localhost:8080}
