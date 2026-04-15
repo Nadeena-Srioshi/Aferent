@@ -32,9 +32,7 @@
             :class="variant === 'danger' ? 'bg-danger/10' : 'bg-warning/10'"
             aria-hidden="true"
           >
-            <svg class="w-6 h-6" :class="variant === 'danger' ? 'text-danger' : 'text-warning'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
+            <AlertTriangle class="w-6 h-6" :class="variant === 'danger' ? 'text-danger' : 'text-warning'" />
           </div>
 
           <h2 :id="titleId" class="text-lg font-bold text-ink mb-2">{{ title }}</h2>
@@ -65,6 +63,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { AlertTriangle } from 'lucide-vue-next'
 
 const props = defineProps({
   modelValue:   { type: Boolean, default: false },

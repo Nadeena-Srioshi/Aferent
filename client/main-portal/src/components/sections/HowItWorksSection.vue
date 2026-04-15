@@ -32,9 +32,7 @@
                 class="w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm transition-transform duration-200 hover:-translate-y-1"
                 :class="step.bgClass"
               >
-                <component :is="'svg'" class="w-7 h-7" :class="step.iconClass" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="step.icon" />
-                </component>
+                <component :is="step.icon" class="w-7 h-7" :class="step.iconClass" aria-hidden="true" />
               </div>
               <span
                 class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center"
@@ -55,9 +53,7 @@
           class="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white font-semibold rounded-xl hover:bg-action shadow-sm hover:shadow-md transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Start Your Journey
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-          </svg>
+          <ArrowRight class="w-5 h-5" aria-hidden="true" />
         </RouterLink>
       </div>
 
@@ -67,26 +63,27 @@
 
 <script setup>
 import { RouterLink } from 'vue-router'
+import { ArrowRight, CalendarDays, Search, Video, UserRoundSearch } from 'lucide-vue-next'
 
 const steps = [
   {
     title: 'Select a Doctor',
     description: 'Search by specialty, condition, or name. Read verified reviews and choose the best fit for your health needs.',
-    icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+    icon: UserRoundSearch,
     bgClass: 'bg-primary/10',
     iconClass: 'text-primary',
   },
   {
     title: 'Book a Time Slot',
     description: 'See real-time availability and book instantly. Choose in-person or video — whatever works for you.',
-    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    icon: CalendarDays,
     bgClass: 'bg-warning/10',
     iconClass: 'text-warning',
   },
   {
     title: 'Talk via Video',
     description: 'Connect with your doctor from home via our secure, encrypted video platform. No travel, no waiting rooms.',
-    icon: 'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
+    icon: Video,
     bgClass: 'bg-success/10',
     iconClass: 'text-success',
   },
