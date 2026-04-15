@@ -39,7 +39,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/doctors/register/license-upload-url",
             "/doctors/register/license-confirm",
             "/hospitals",
-            "/specializations"
+            "/specializations",
+            "/prescriptions"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -55,7 +56,14 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
 
         // allow GET /doctors/** without token — public profile viewing
         // but POST/PUT/PATCH/DELETE on /doctors/** still require token
-        if (path.startsWith("/doctors") && "GET".equals(method)) {
+        // only truly public GET endpoints
+        boolean isPublicGet = "GET".equals(method) && (
+                path.equals("/doctors") ||
+                path.matches("/doctors/DOC_[^/]+") ||
+                path.matches("/doctors/DOC_[^/]+/profile/pic-url")
+        );
+
+        if (isPublicGet) {
             return chain.filter(exchange);
         }
 
@@ -106,6 +114,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
     }
+    
     @Override
     public int getOrder() {
         return -1;   // runs after CorrelationIdFilter
