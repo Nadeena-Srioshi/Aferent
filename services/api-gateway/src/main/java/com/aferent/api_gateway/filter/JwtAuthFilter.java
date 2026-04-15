@@ -93,13 +93,24 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            ServerHttpRequest mutatedRequest = exchange.getRequest()
+                // For auth-service paths, preserve Authorization so auth-service can
+                // perform role-sensitive operations like /auth/admin/** and /auth/deactivate.
+                boolean isAuthServicePath = path.startsWith("/auth/");
+
+                // For non-auth services, strip raw JWT and forward identity headers only.
+                ServerHttpRequest.Builder requestBuilder = exchange.getRequest()
                     .mutate()
                     .header("X-User-ID", claims.getSubject())
                     .header("X-User-Role", claims.get("role", String.class))
-                    .header("X-User-Email", claims.get("email", String.class))
-                    .header("Authorization", "")
-                    .build();
+                    .header("X-User-Email", claims.get("email", String.class));
+
+                if (isAuthServicePath) {
+                    requestBuilder.header("Authorization", authHeader);
+                } else {
+                    requestBuilder.headers(headers -> headers.remove("Authorization")); // strip JWT outside auth-service
+                }
+
+                ServerHttpRequest mutatedRequest = requestBuilder.build();
 
             log.info("Authenticated userId={} role={} path={}",
                     claims.getSubject(),
@@ -114,7 +125,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
     }
-    
+
     @Override
     public int getOrder() {
         return -1;   // runs after CorrelationIdFilter
