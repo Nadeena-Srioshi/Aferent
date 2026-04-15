@@ -32,7 +32,7 @@ public class DoctorScheduleController {
     // get own weekly schedule
     @GetMapping("/{doctorId}/schedule/weekly")
     public ResponseEntity<WeeklySchedule> getWeeklySchedule(
-            @PathVariable String doctorId,
+            @PathVariable String doctorId
     ) {
         return ResponseEntity.ok(scheduleService.getWeeklySchedule(doctorId));
     }
