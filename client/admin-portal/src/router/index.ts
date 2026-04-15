@@ -24,16 +24,16 @@ const router = createRouter({
           name: 'dashboard',
           component: () => import('@/views/DashboardView.vue'),
         },
-        // {
-        //   path: 'patients',
-        //   name: 'patients',
-        //   component: () => import('@/views/PatientsView.vue'),
-        // },
-        // {
-        //   path: 'patients/:patientId',
-        //   name: 'patient-detail',
-        //   component: () => import('@/views/PatientDetailView.vue'),
-        // },
+        {
+          path: 'patients',
+          name: 'patients',
+          component: () => import('@/views/PatientsView.vue'),
+        },
+        {
+          path: 'patients/:patientId',
+          name: 'patient-detail',
+          component: () => import('@/views/PatientDetailView.vue'),
+        },
         // {
         //   path: 'doctors',
         //   name: 'doctors',
