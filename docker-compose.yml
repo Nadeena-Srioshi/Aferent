@@ -233,6 +233,7 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI_PAYMENT_SERVICE}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       kafka:
         condition: service_healthy
