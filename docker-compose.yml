@@ -106,9 +106,6 @@ services:
       timeout: 5s
       retries: 5
 
-  minio-init:
-    image: minio/mc:latest
-    container_name: minio-init
   minio-event-init:
     image: minio/mc:latest
     container_name: minio-event-init
