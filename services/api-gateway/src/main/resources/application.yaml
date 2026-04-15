@@ -28,6 +28,11 @@ spring:
           predicates:
             - Path=/doctors/**, /admin/doctors/**,/admin/hospitals/**, /admin/specializations/**, /hospitals/**, /specializations/**
 
+        - id: prescriptions-public
+          uri: http://doctor-service:3003
+          predicates:
+            - Path=/prescriptions/**
+
         # APPOINTMENT SERVICE
         - id: appointment-service
           uri: http://appointment-service:3004
