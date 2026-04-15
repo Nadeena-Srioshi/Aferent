@@ -97,15 +97,20 @@ public class AppointmentService {
                         .compareTo(b.getAppointmentNumber()))
                 .collect(Collectors.toList());
 
-        if (available.isEmpty()) {
-            throw new AppException(
-                    "No physical slots available for this date", HttpStatus.CONFLICT);
-        }
+        // if (available.isEmpty()) {
+        //     throw new AppException(
+        //         "No physical slots available for this date", HttpStatus.CONFLICT);
+        // }
 
         // Always assign the next available slot number
-        GeneratedSlot slot = available.get(0);
-        slot.setBooked(true);
-        slotRepository.save(slot);
+        // GeneratedSlot slot = available.get(0);
+        // slot.setBooked(true);
+        // slotRepository.save(slot);
+        GeneratedSlot slot = available.isEmpty() ? null : available.get(0);
+        if (slot != null) {
+            slot.setBooked(true);
+            slotRepository.save(slot);
+        }
 
         return Appointment.builder()
                 .patientId(patientId)
