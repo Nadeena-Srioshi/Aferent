@@ -3,6 +3,7 @@ package com.aferent.doctor_service.service;
 import com.aferent.doctor_service.dto.VerifyDoctorRequest;
 import com.aferent.doctor_service.exception.ForbiddenOperationException;
 import com.aferent.doctor_service.exception.ResourceNotFoundException;
+import com.aferent.doctor_service.kafka.DoctorEventProducer;
 import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.List;
 public class AdminDoctorService {
 
     private final DoctorRepository doctorRepository;
+    private final DoctorEventProducer doctorEventProducer;
 
     public List<Doctor> getPendingDoctors() {
         return doctorRepository.findByStatus(Doctor.RegistrationStatus.PENDING_VERIFICATION);
@@ -49,6 +51,14 @@ public class AdminDoctorService {
             throw new IllegalArgumentException("Invalid action. Use APPROVE or REJECT");
         }
 
-        return doctorRepository.save(doctor);
+        Doctor savedDoctor = doctorRepository.save(doctor);
+
+        // send event to Auth Service
+        doctorEventProducer.sendVerificationEvent(
+                savedDoctor.getAuthId(),
+                request.getAction().toUpperCase()
+        );
+
+        return savedDoctor;
     }
 }
