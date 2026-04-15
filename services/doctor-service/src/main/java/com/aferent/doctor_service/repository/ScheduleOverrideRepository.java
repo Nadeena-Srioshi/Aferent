@@ -11,4 +11,5 @@ public interface ScheduleOverrideRepository extends MongoRepository<ScheduleOver
     List<ScheduleOverride> findByDoctorId(String doctorId);
     List<ScheduleOverride> findByDoctorIdAndDateGreaterThanEqual(String doctorId, LocalDate date);
     Optional<ScheduleOverride> findByDoctorIdAndDate(String doctorId, LocalDate date);
+    
 }

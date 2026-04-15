@@ -31,9 +31,7 @@ public class DoctorScheduleController {
 
     // get own weekly schedule
     @GetMapping("/{doctorId}/schedule/weekly")
-    public ResponseEntity<WeeklySchedule> getWeeklySchedule(
-            @PathVariable String doctorId
-    ) {
+    public ResponseEntity<?> getWeeklySchedule(@PathVariable String doctorId) {
         return ResponseEntity.ok(scheduleService.getWeeklySchedule(doctorId));
     }
 
@@ -49,10 +47,7 @@ public class DoctorScheduleController {
 
     // get all upcoming overrides
     @GetMapping("/{doctorId}/schedule/overrides")
-    public ResponseEntity<List<ScheduleOverride>> getOverrides(
-            @PathVariable String doctorId,
-            @RequestHeader("X-User-ID") String authId
-    ) {
+    public ResponseEntity<?> getUpcomingOverrides(@PathVariable String doctorId) {
         return ResponseEntity.ok(scheduleService.getUpcomingOverrides(doctorId));
     }
 
@@ -66,4 +61,5 @@ public class DoctorScheduleController {
         scheduleService.deleteOverride(doctorId, authId, overrideId);
         return ResponseEntity.noContent().build();
     }
+    
 }
