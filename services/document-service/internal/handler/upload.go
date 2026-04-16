@@ -63,8 +63,16 @@ func (h *PresignUpload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	internalUploadURL, err := h.store.PresignPutInternal(r.Context(), objectKey)
+	if err != nil {
+		log.Printf("PresignPutInternal error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, errorBody("could not generate upload URL"))
+		return
+	}
+
 	resp := model.PresignUploadResponse{
-		UploadURL: uploadURL,
+		UploadURL:         uploadURL,
+		InternalUploadURL: internalUploadURL,
 	}
 
 	switch req.Visibility {
