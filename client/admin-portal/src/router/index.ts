@@ -44,11 +44,11 @@ const router = createRouter({
           name: 'appointments',
           component: () => import('@/views/AppointmentsView.vue'),
         },
-        // {
-        //   path: 'payments',
-        //   name: 'payments',
-        //   component: () => import('@/views/PaymentsView.vue'),
-        // },
+        {
+          path: 'payments',
+          name: 'payments',
+          component: () => import('@/views/PaymentsView.vue'),
+        },
         // {
         //   path: 'notifications',
         //   name: 'notifications',
