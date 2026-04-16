@@ -1,6 +1,8 @@
 package com.aferent.appointment_service.kafka;
 
 import com.aferent.appointment_service.dto.DoctorScheduleDto;
+import com.aferent.appointment_service.model.Appointment;
+import com.aferent.appointment_service.repository.AppointmentRepository;
 import com.aferent.appointment_service.repository.GeneratedSlotRepository;
 import com.aferent.appointment_service.service.SlotGenerationService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +24,7 @@ public class KafkaConsumer {
 
     private final SlotGenerationService   slotGenerationService;
     private final GeneratedSlotRepository slotRepository;
+    private final AppointmentRepository   appointmentRepository;
     private final ObjectMapper            objectMapper;
     private final WebClient.Builder       webClientBuilder;
 
@@ -71,6 +74,37 @@ public class KafkaConsumer {
             }
         } catch (Exception e) {
             log.error("Error processing doctor.schedule.weekly.deleted: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Telemedicine-service publishes this when the first participant joins a video call.
+     * We save the session link on the appointment so patients/doctors can find it later.
+     */
+    @KafkaListener(topics = "telemedicine.session.started", groupId = "appointment-service")
+    public void onTelemedicineSessionStarted(String message) {
+        try {
+            JsonNode node = objectMapper.readTree(message);
+            String appointmentId = node.path("appointmentId").asText(null);
+            String sessionLink = node.path("sessionLink").asText(null);
+            if (appointmentId == null || appointmentId.isBlank()) {
+                log.warn("telemedicine.session.started: missing appointmentId");
+                return;
+            }
+            if (sessionLink == null || sessionLink.isBlank()) {
+                log.warn("telemedicine.session.started: missing sessionLink for appointmentId={}", appointmentId);
+                return;
+            }
+            appointmentRepository.findById(appointmentId).ifPresentOrElse(
+                    appointment -> {
+                        appointment.setVideoSessionLink(sessionLink);
+                        appointmentRepository.save(appointment);
+                        log.info("Saved videoSessionLink for appointmentId={}", appointmentId);
+                    },
+                    () -> log.warn("telemedicine.session.started: appointment {} not found", appointmentId)
+            );
+        } catch (Exception e) {
+            log.error("Error processing telemedicine.session.started: {}", e.getMessage(), e);
         }
     }
 

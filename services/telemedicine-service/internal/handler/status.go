@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 // HandleStatus returns the current state of a video session.
@@ -37,7 +37,7 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status, err := h.Sessions.FetchStatus(r.Context(), appointmentID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "session not found", http.StatusNotFound)
 			return
 		}

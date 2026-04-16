@@ -13,11 +13,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -28,9 +30,13 @@ public class AppointmentService {
     private final AppointmentRepository     appointmentRepository;
     private final GeneratedSlotRepository   slotRepository;
     private final KafkaProducer             kafkaProducer;
+    private final WebClient.Builder         webClientBuilder;
 
     @Value("${appointment.refund-cutoff-hours}")
     private int refundCutoffHours;
+
+    @Value("${services.doctor-service-url:http://doctor-service:3003}")
+    private String doctorServiceUrl;
 
     // ─── BROWSE SLOTS ────────────────────────────────────────────────────────
 
@@ -113,6 +119,7 @@ public class AppointmentService {
                 .patientEmail(patientEmail)
                 .patientName(request.getPatientName())
                 .doctorId(request.getDoctorId())
+                .doctorAuthId(resolveDoctorAuthId(request.getDoctorId()))
                 .doctorName(request.getDoctorName())
                 .scheduleId(request.getScheduleId())
                 .generatedSlotId(slot.getId())
@@ -157,6 +164,7 @@ public class AppointmentService {
                 .patientEmail(patientEmail)
                 .patientName(request.getPatientName())
                 .doctorId(request.getDoctorId())
+                .doctorAuthId(resolveDoctorAuthId(request.getDoctorId()))
                 .doctorName(request.getDoctorName())
                 .scheduleId(request.getScheduleId())
                 .generatedSlotId(slot.getId())
@@ -294,7 +302,8 @@ public class AppointmentService {
         Appointment appointment = findById(appointmentId);
         boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
         boolean isOwner = appointment.getPatientId().equals(userId)
-                || appointment.getDoctorId().equals(userId);
+                || appointment.getDoctorId().equals(userId)
+                || (appointment.getDoctorAuthId() != null && appointment.getDoctorAuthId().equals(userId));
 
         if (!isAdmin && !isOwner) {
             throw new AppException("Unauthorized", HttpStatus.FORBIDDEN);
@@ -307,20 +316,36 @@ public class AppointmentService {
         if ("ADMIN".equalsIgnoreCase(role)) {
             list = appointmentRepository.findAllByOrderByCreatedAtDesc();
         } else if ("DOCTOR".equalsIgnoreCase(role)) {
-            list = appointmentRepository.findByDoctorId(userId);
+            list = appointmentRepository.findByDoctorAuthId(userId);
         } else {
             list = appointmentRepository.findByPatientId(userId);
         }
         return list.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    public List<AppointmentResponse> getPendingVideoRequests(String doctorId) {
+    public List<AppointmentResponse> getPendingVideoRequests(String doctorAuthId) {
         return appointmentRepository
-                .findByDoctorIdAndStatus(
-                        doctorId, AppointmentStatus.PENDING_DOCTOR_APPROVAL)
+                .findByDoctorAuthIdAndStatus(
+                        doctorAuthId, AppointmentStatus.PENDING_DOCTOR_APPROVAL)
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private String resolveDoctorAuthId(String doctorId) {
+        try {
+            WebClient client = webClientBuilder.baseUrl(doctorServiceUrl).build();
+            Map<String, Object> profile = client.get()
+                    .uri("/doctors/{id}", doctorId)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+            return profile != null ? (String) profile.get("authId") : null;
+        } catch (Exception e) {
+            log.warn("Could not resolve authId for doctorId={}: {}", doctorId, e.getMessage());
+            return null;
+        }
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────
@@ -355,6 +380,7 @@ public class AppointmentService {
                 .patientId(a.getPatientId())
                 .patientName(a.getPatientName())
                 .doctorId(a.getDoctorId())
+                .doctorAuthId(a.getDoctorAuthId())
                 .doctorName(a.getDoctorName())
                 .type(a.getType())
                 .status(a.getStatus())

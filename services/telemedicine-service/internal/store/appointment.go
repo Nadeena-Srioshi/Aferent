@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aferent/telemedicine-service/internal/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,16 +26,58 @@ type AppointmentStore struct {
 }
 
 // appointmentAPIResponse mirrors the JSON returned by GET /appointments/{id}.
+// VideoSlotStart/End are RawMessage because Jackson 3.x serializes LocalTime as
+// an array [14,0,0] by default, but may also produce a string "14:00:00".
 type appointmentAPIResponse struct {
-	ID              string  `json:"id"`
-	PatientID       string  `json:"patientId"`
-	DoctorID        string  `json:"doctorId"`
-	Type            string  `json:"type"`
-	Status          string  `json:"status"`
-	AppointmentDate string  `json:"appointmentDate"` // "2025-04-07"
-	VideoSlotStart  string  `json:"videoSlotStart"`  // "14:30:00"
-	VideoSlotEnd    string  `json:"videoSlotEnd"`    // "15:00:00"
-	ConsultationFee float64 `json:"consultationFee"`
+	ID              string          `json:"id"`
+	PatientID       string          `json:"patientId"`
+	DoctorID        string          `json:"doctorId"`
+	DoctorAuthID    string          `json:"doctorAuthId"`
+	Type            string          `json:"type"`
+	Status          string          `json:"status"`
+	AppointmentDate string          `json:"appointmentDate"` // "2025-04-07"
+	VideoSlotStart  json.RawMessage `json:"videoSlotStart"`  // "14:30:00" or [14,30,0]
+	VideoSlotEnd    json.RawMessage `json:"videoSlotEnd"`    // "15:00:00" or [15,0,0]
+	ConsultationFee float64         `json:"consultationFee"`
+}
+
+// parseTimeField parses a LocalTime value from Jackson which may be either:
+//   - a JSON string: "14:30:00" or "14:30"
+//   - a JSON array:  [14, 30, 0] or [14, 30]
+func parseTimeField(raw json.RawMessage) (time.Time, error) {
+	if len(raw) == 0 {
+		return time.Time{}, fmt.Errorf("empty time field")
+	}
+	// String form
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return time.Time{}, err
+		}
+		for _, layout := range []string{"15:04:05", "15:04"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("unrecognised time string: %s", s)
+	}
+	// Array form [h, m, s?, nano?]
+	if raw[0] == '[' {
+		var parts []int
+		if err := json.Unmarshal(raw, &parts); err != nil {
+			return time.Time{}, err
+		}
+		if len(parts) < 2 {
+			return time.Time{}, fmt.Errorf("time array too short: %v", parts)
+		}
+		h, m := parts[0], parts[1]
+		s := 0
+		if len(parts) >= 3 {
+			s = parts[2]
+		}
+		return time.Date(0, 1, 1, h, m, s, 0, time.UTC), nil
+	}
+	return time.Time{}, fmt.Errorf("unrecognised time format: %s", string(raw))
 }
 
 // EnsureAppointment verifies the appointment exists and the actor is allowed to join.
@@ -92,7 +134,7 @@ func (a *AppointmentStore) ensureRemote(ctx context.Context, appointmentID strin
 	if actor.Role == "PATIENT" && appt.PatientID != actor.UserID {
 		return nil, fmt.Errorf("patient is not owner of appointment")
 	}
-	if actor.Role == "DOCTOR" && appt.DoctorID != actor.UserID {
+	if actor.Role == "DOCTOR" && appt.DoctorID != actor.UserID && appt.DoctorAuthID != actor.UserID {
 		return nil, fmt.Errorf("doctor is not owner of appointment")
 	}
 
@@ -115,9 +157,9 @@ func (a *AppointmentStore) parseSchedule(appt appointmentAPIResponse) (time.Time
 	now := time.Now().UTC()
 
 	// Try to parse appointmentDate + videoSlotStart
-	if appt.AppointmentDate != "" && appt.VideoSlotStart != "" {
+	if appt.AppointmentDate != "" && len(appt.VideoSlotStart) > 0 {
 		date, dateErr := time.Parse("2006-01-02", appt.AppointmentDate)
-		slotStart, timeErr := time.Parse("15:04:05", appt.VideoSlotStart)
+		slotStart, timeErr := parseTimeField(appt.VideoSlotStart)
 
 		if dateErr == nil && timeErr == nil {
 			scheduledStart := time.Date(
@@ -128,8 +170,8 @@ func (a *AppointmentStore) parseSchedule(appt appointmentAPIResponse) (time.Time
 
 			// Calculate duration from slot times
 			duration := a.DefaultSessionDurationSec
-			if appt.VideoSlotEnd != "" {
-				if slotEnd, err := time.Parse("15:04:05", appt.VideoSlotEnd); err == nil {
+			if len(appt.VideoSlotEnd) > 0 {
+				if slotEnd, err := parseTimeField(appt.VideoSlotEnd); err == nil {
 					dur := time.Date(
 						date.Year(), date.Month(), date.Day(),
 						slotEnd.Hour(), slotEnd.Minute(), slotEnd.Second(),
@@ -159,7 +201,7 @@ func (a *AppointmentStore) ensureStub(ctx context.Context, appointmentID string,
 	).Scan(&patientID, &doctorID, &scheduledStart, &scheduledDuration)
 
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
 		// Appointment doesn't exist — create a stub.

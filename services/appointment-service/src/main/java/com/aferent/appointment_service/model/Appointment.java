@@ -23,6 +23,7 @@ public class Appointment {
     private String patientEmail;
 
     private String doctorId;
+    private String doctorAuthId;   // authId from auth-service (for JWT-based queries)
     private String doctorName;
 
     // Reference to friend's schedule + your generated slot

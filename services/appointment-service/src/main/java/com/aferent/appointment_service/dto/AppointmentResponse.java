@@ -16,6 +16,7 @@ public class AppointmentResponse {
     private String patientId;
     private String patientName;
     private String doctorId;
+    private String doctorAuthId;
     private String doctorName;
     private AppointmentType type;
     private AppointmentStatus status;
