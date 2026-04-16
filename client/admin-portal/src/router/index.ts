@@ -39,11 +39,11 @@ const router = createRouter({
           name: 'doctors',
           component: () => import('@/views/DoctorsView.vue'),
         },
-        // {
-        //   path: 'appointments',
-        //   name: 'appointments',
-        //   component: () => import('@/views/AppointmentsView.vue'),
-        // },
+        {
+          path: 'appointments',
+          name: 'appointments',
+          component: () => import('@/views/AppointmentsView.vue'),
+        },
         // {
         //   path: 'payments',
         //   name: 'payments',
