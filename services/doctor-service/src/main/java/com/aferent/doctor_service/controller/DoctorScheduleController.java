@@ -35,6 +35,15 @@ public class DoctorScheduleController {
         return ResponseEntity.ok(scheduleService.getWeeklySchedule(doctorId));
     }
 
+    @DeleteMapping("/{doctorId}/schedule/weekly")
+    public ResponseEntity<Void> deleteWeeklySchedule(
+            @PathVariable String doctorId,
+            @RequestHeader("X-User-ID") String authId
+    ) {
+        scheduleService.deleteWeeklySchedule(doctorId, authId);
+        return ResponseEntity.noContent().build();
+    }
+
     // add a date-specific override (block or add)
     @PostMapping("/{doctorId}/schedule/overrides")
     public ResponseEntity<ScheduleOverride> addOverride(

@@ -8,6 +8,7 @@ import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.model.ScheduleOverride;
 import com.aferent.doctor_service.model.WeeklySchedule;
 import com.aferent.doctor_service.model.WeeklySchedule.DaySchedule;
+import com.aferent.doctor_service.kafka.DoctorEventProducer;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import com.aferent.doctor_service.repository.HospitalRepository;
 import com.aferent.doctor_service.repository.ScheduleOverrideRepository;
@@ -19,7 +20,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -31,6 +35,7 @@ public class DoctorScheduleService {
     private final ScheduleOverrideRepository scheduleOverrideRepository;
     private final DoctorRepository doctorRepository;
     private final HospitalRepository hospitalRepository;
+    private final DoctorEventProducer doctorEventProducer;
 
     // weekly schedule   ********
 
@@ -53,9 +58,21 @@ public class DoctorScheduleService {
         schedule.setSunday(assignSessionIds(request.getSunday()));
 
         WeeklySchedule saved = weeklyScheduleRepository.save(schedule);
+        publishWeeklyUpsertEvents(saved);
         log.info("Weekly schedule saved for doctorId={}", doctorId);
 
         return saved;
+    }
+
+    public void deleteWeeklySchedule(String doctorId, String authId) {
+        validateOwnership(doctorId, authId);
+
+        WeeklySchedule schedule = weeklyScheduleRepository.findByDoctorId(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("No schedule found"));
+
+        weeklyScheduleRepository.deleteByDoctorId(doctorId);
+        publishWeeklyDeleteEvents(schedule);
+        log.info("Weekly schedule deleted for doctorId={}", doctorId);
     }
 
     public WeeklySchedule getWeeklySchedule(String doctorId) {
@@ -115,6 +132,7 @@ public class DoctorScheduleService {
         }
 
         ScheduleOverride saved = scheduleOverrideRepository.save(override);
+        publishOverrideUpsertEvents(saved);
         log.info("Override saved doctorId={} date={} action={}",
                 doctorId, request.getDate(), request.getAction());
 
@@ -138,6 +156,7 @@ public class DoctorScheduleService {
         }
 
         scheduleOverrideRepository.deleteById(overrideId);
+        publishOverrideDeletedEvent(override);
         log.info("Override deleted overrideId={} doctorId={}", overrideId, doctorId);
     }
 
@@ -275,6 +294,162 @@ public class DoctorScheduleService {
         });
 
         return slots;
+    }
+
+    private void publishWeeklyUpsertEvents(WeeklySchedule schedule) {
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "MONDAY", schedule.getMonday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "TUESDAY", schedule.getTuesday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "WEDNESDAY", schedule.getWednesday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "THURSDAY", schedule.getThursday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "FRIDAY", schedule.getFriday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "SATURDAY", schedule.getSaturday());
+        publishWeeklyDayUpsert(schedule.getDoctorId(), "SUNDAY", schedule.getSunday());
+    }
+
+    private void publishWeeklyDeleteEvents(WeeklySchedule schedule) {
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getMonday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getTuesday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getWednesday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getThursday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getFriday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getSaturday());
+        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getSunday());
+    }
+
+    private void publishWeeklyDayUpsert(String doctorId, String dayOfWeek, List<DaySchedule> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return;
+        }
+
+        slots.forEach(slot -> doctorEventProducer.publishWeeklyUpserted(
+                doctorId,
+                slot.getSessionId(),
+                dayOfWeek,
+                slot.getStartTime(),
+                slot.getEndTime(),
+                mapType(slot.getType()),
+                slot.getHospital()
+        ));
+    }
+
+    private void publishWeeklyDayDelete(String doctorId, List<DaySchedule> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return;
+        }
+
+        slots.forEach(slot -> doctorEventProducer.publishWeeklyDeleted(doctorId, slot.getSessionId()));
+    }
+
+    private void publishOverrideUpsertEvents(ScheduleOverride override) {
+        switch (override.getAction()) {
+            case BLOCK -> doctorEventProducer.publishOverrideUpsertedBlock(
+                    override.getDoctorId(),
+                    override.getDate()
+            );
+            case ADD -> {
+                if (override.getSlots() == null || override.getSlots().isEmpty()) {
+                    return;
+                }
+
+                override.getSlots().forEach(slot ->
+                        doctorEventProducer.publishOverrideUpsertedAdd(
+                                override.getDoctorId(),
+                                buildOverrideScheduleId(override.getId(), slot.getSessionId()),
+                                override.getDate(),
+                                slot.getStartTime(),
+                                slot.getEndTime(),
+                                mapType(slot.getType()),
+                                slot.getHospital()
+                        )
+                );
+            }
+            case CANCEL_SESSION -> doctorEventProducer.publishOverrideUpsertedCancelSession(
+                    override.getDoctorId(),
+                    override.getDate(),
+                    override.getSessionId()
+            );
+        }
+    }
+
+    private void publishOverrideDeletedEvent(ScheduleOverride override) {
+        switch (override.getAction()) {
+            case ADD -> {
+                if (override.getSlots() == null || override.getSlots().isEmpty()) {
+                    return;
+                }
+                override.getSlots().forEach(slot ->
+                        doctorEventProducer.publishOverrideDeleted(
+                                override.getDoctorId(),
+                                "ADD",
+                                override.getDate(),
+                                buildOverrideScheduleId(override.getId(), slot.getSessionId()),
+                                null,
+                                null
+                        )
+                );
+            }
+            case BLOCK -> doctorEventProducer.publishOverrideDeleted(
+                    override.getDoctorId(),
+                    "BLOCK",
+                    override.getDate(),
+                    null,
+                    null,
+                    buildRestoreSchedulesForDate(override.getDoctorId(), override.getDate(), null)
+            );
+            case CANCEL_SESSION -> doctorEventProducer.publishOverrideDeleted(
+                    override.getDoctorId(),
+                    "CANCEL_SESSION",
+                    override.getDate(),
+                    null,
+                    override.getSessionId(),
+                    buildRestoreSchedulesForDate(override.getDoctorId(), override.getDate(), override.getSessionId())
+            );
+        }
+    }
+
+    private List<Map<String, Object>> buildRestoreSchedulesForDate(String doctorId,
+                                                                   LocalDate date,
+                                                                   String onlySessionId) {
+        WeeklySchedule schedule = weeklyScheduleRepository.findByDoctorId(doctorId).orElse(null);
+        if (schedule == null) {
+            return List.of();
+        }
+
+        List<DaySchedule> daySchedules = getSlotsByDay(schedule, date);
+        if (daySchedules == null || daySchedules.isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> restoreSchedules = new ArrayList<>();
+        for (DaySchedule slot : daySchedules) {
+            if (onlySessionId != null && !onlySessionId.equals(slot.getSessionId())) {
+                continue;
+            }
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", slot.getSessionId());
+            data.put("doctorId", doctorId);
+            data.put("dayOfWeek", date.getDayOfWeek().name());
+            data.put("startTime", slot.getStartTime());
+            data.put("endTime", slot.getEndTime());
+            data.put("type", mapType(slot.getType()));
+            data.put("hospitalName", slot.getHospital());
+            data.put("active", true);
+            restoreSchedules.add(data);
+        }
+
+        return restoreSchedules;
+    }
+
+    private String buildOverrideScheduleId(String overrideId, String sessionId) {
+        return "override-" + overrideId + "-" + sessionId;
+    }
+
+    private String mapType(DaySchedule.SessionType type) {
+        if (type == DaySchedule.SessionType.IN_PERSON) {
+            return "PHYSICAL";
+        }
+        return "VIDEO";
     }
 
     // security    *******

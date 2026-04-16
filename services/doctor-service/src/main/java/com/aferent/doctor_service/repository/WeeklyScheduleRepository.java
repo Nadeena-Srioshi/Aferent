@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface WeeklyScheduleRepository extends MongoRepository<WeeklySchedule, String> {
     Optional<WeeklySchedule> findByDoctorId(String doctorId);
     boolean existsByDoctorId(String doctorId);
+    void deleteByDoctorId(String doctorId);
 }
