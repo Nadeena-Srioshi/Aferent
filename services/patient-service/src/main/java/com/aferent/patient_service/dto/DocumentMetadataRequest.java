@@ -1,0 +1,17 @@
+package com.aferent.patient_service.dto;
+
+import lombok.Data;
+
+@Data
+public class DocumentMetadataRequest {
+    private String documentId;
+    private String minioKey;
+    private String permanentUrl;
+    private String visibility;
+    private String category;
+    private String originalFileName;
+    private String displayName;
+    private String contentType;
+    private Long fileSize;
+    private String documentType;   // LAB_REPORT, PRESCRIPTION, SCAN etc
+}

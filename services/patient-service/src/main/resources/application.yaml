@@ -1,0 +1,40 @@
+server:
+  port: 3002
+
+spring:
+  application:
+    name: patient-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: patient-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.HashMap
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+document-service:
+  base-url: ${DOCUMENT_SERVICE_URL:http://document-service:3009}
+  service-id: ${DOCUMENT_SERVICE_ID:patient-service}
+
+app:
+  upload-events:
+    topic: ${UPLOAD_EVENTS_TOPIC:minio.events}
+  uploads:
+    pending-retention-hours: ${UPLOAD_PENDING_RETENTION_HOURS:24}
+    bucket: ${UPLOAD_BUCKET:app-storage}
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"

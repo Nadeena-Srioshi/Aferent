@@ -34,6 +34,14 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/auth/refresh",
             "/auth/logout",
             "/payments/webhook",
+            "/actuator",
+            "/doctors/register/profile",
+            "/doctors/register/license-upload-url",
+            "/doctors/register/license-confirm",
+            "/hospitals",
+            "/specializations",
+            "/prescriptions",
+            "/sessions/webhooks",
             "/actuator"
     );
 
@@ -46,13 +54,29 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
+        String method = exchange.getRequest().getMethod().name();
 
-        // Check if this path is public — skip JWT if so
+        // allow GET /doctors/** without token — public profile viewing
+        // but POST/PUT/PATCH/DELETE on /doctors/** still require token
+        // only truly public GET endpoints
+        boolean isPublicGet = "GET".equals(method) && (
+                path.equals("/doctors") ||
+                path.matches("/doctors/DOC_[^/]+") ||
+                path.matches("/doctors/DOC_[^/]+/schedule/weekly") ||
+                path.matches("/doctors/DOC_[^/]+/schedule/overrides") ||
+                path.matches("/doctors/DOC_[^/]+/profile/pic-url")
+        );
+
+        if (isPublicGet) {
+            return chain.filter(exchange);
+        }
+
+        // check hardcoded public paths
         boolean isPublic = publicPaths.stream()
                 .anyMatch(p -> path.startsWith(p) || pathMatcher.match(p + "/**", path));
 
         if (isPublic) {
-            return chain.filter(exchange);   // just forward, no JWT check
+            return chain.filter(exchange);
         }
 
         // Get the Authorization header
@@ -64,25 +88,33 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
 
-        String token = authHeader.substring(7);   // strip "Bearer " prefix
+        String token = authHeader.substring(7);
 
         try {
-            // Validate and decode the JWT
             Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
 
-            // Strip the JWT and inject plain headers instead
-            // Downstream services read these — they never see the raw JWT
-            ServerHttpRequest mutatedRequest = exchange.getRequest()
+                // For auth-service paths, preserve Authorization so auth-service can
+                // perform role-sensitive operations like /auth/admin/** and /auth/deactivate.
+                boolean isAuthServicePath = path.startsWith("/auth/");
+
+                // For non-auth services, strip raw JWT and forward identity headers only.
+                ServerHttpRequest.Builder requestBuilder = exchange.getRequest()
                     .mutate()
                     .header("X-User-ID", claims.getSubject())
                     .header("X-User-Role", claims.get("role", String.class))
-                    .header("X-User-Email", claims.get("email", String.class))
-                    .header("Authorization", "")   // strip the JWT
-                    .build();
+                    .header("X-User-Email", claims.get("email", String.class));
+
+                if (isAuthServicePath) {
+                    requestBuilder.header("Authorization", authHeader);
+                } else {
+                    requestBuilder.headers(headers -> headers.remove("Authorization")); // strip JWT outside auth-service
+                }
+
+                ServerHttpRequest mutatedRequest = requestBuilder.build();
 
             log.info("Authenticated userId={} role={} path={}",
                     claims.getSubject(),

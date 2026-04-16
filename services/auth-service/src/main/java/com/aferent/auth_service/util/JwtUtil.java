@@ -28,20 +28,23 @@ public class JwtUtil {
         this.refreshTokenExpiry = refreshTokenExpiry;
     }
 
-    public String generateAccessToken(String userId, String email, String role) {
+    public String generateAccessToken(String userId, String email, String role, boolean active, long tokenVersion) {
         return Jwts.builder()
                 .subject(userId)
                 .claim("email", email)
                 .claim("role", role)
+                .claim("active", active)
+                .claim("rtv", tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiry))
                 .signWith(key)
                 .compact();
     }
 
-    public String generateRefreshToken(String userId) {
+    public String generateRefreshToken(String userId, long refreshTokenVersion) {
         return Jwts.builder()
                 .subject(userId)
+                .claim("rtv", refreshTokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiry))
                 .signWith(key)
@@ -64,5 +67,17 @@ public class JwtUtil {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public long extractRefreshTokenVersion(Claims claims) {
+        Object raw = claims.get("rtv");
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        throw new RuntimeException("Invalid refresh token version");
+    }
+
+    public long extractTokenVersion(Claims claims) {
+        return extractRefreshTokenVersion(claims);
     }
 }
