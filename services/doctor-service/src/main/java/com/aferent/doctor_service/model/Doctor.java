@@ -42,6 +42,7 @@ public class Doctor {
     // profile fields — filled after login
     private String bio;
     private String profilePicKey;
+    private String profilePicUrl;  // permanent URL for public profile picture
     private List<String> hospitals;
     private Double consultationFee;
     private List<String> languages;

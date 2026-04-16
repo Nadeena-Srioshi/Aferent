@@ -234,8 +234,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      document-service:
+        condition: service_started
     environment:
       MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -245,6 +245,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
       PRESCRIPTION_BASE_URL: http://localhost:8080
+      DOCUMENT_SERVICE_URL: http://document-service:3009
+      DOCUMENT_SERVICE_ID: doctor-service
     volumes:
       - ./logs/doctor-service:/app/logs
     healthcheck:
