@@ -1,21 +1,36 @@
 package com.aferent.appointment_service.dto;
 
-// dto/DoctorScheduleDto.java
-// Maps the JSON your friend's Doctor Service returns for a schedule entry
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class DoctorScheduleDto {
-    private String id;              // scheduleId from doctor service
+    private String id;              // overall schedule ID (e.g., "69e0006a4fd219a9dc42c7ad")
     private String doctorId;
-    private String doctorName;
-    private String type;            // "PHYSICAL" or "VIDEO"
-    private String dayOfWeek;       // "MONDAY"
-    private String startTime;       // "16:00"
-    private String endTime;         // "18:00"
-    private String hospitalName;
-    private String hospitalAddress;
-    private Integer sessionDurationMinutes;
-    private double consultationFee;
-    private boolean active;
+    
+    // Weekly structure - each day can have multiple sessions
+    private List<SessionDto> monday;
+    private List<SessionDto> tuesday;
+    private List<SessionDto> wednesday;
+    private List<SessionDto> thursday;
+    private List<SessionDto> friday;
+    private List<SessionDto> saturday;
+    private List<SessionDto> sunday;
+    
+    private String updatedAt;
+    
+    @Data
+    public static class SessionDto {
+        private String sessionId;
+        private String startTime;      // "08:00"
+        private String endTime;        // "12:00"
+        private String hospital;       // hospital ID or null
+        private String type;           // "IN_PERSON" or "VIDEO"
+        
+        // Additional fields you might need
+        private String hospitalName;
+        private String hospitalAddress;
+        private Integer sessionDurationMinutes;
+        private Double consultationFee;
+    }
 }

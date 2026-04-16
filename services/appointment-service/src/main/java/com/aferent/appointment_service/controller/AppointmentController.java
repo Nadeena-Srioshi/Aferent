@@ -54,6 +54,7 @@ public class AppointmentController {
             @RequestHeader(value = "X-User-Email",  defaultValue = "") String email,
             @RequestHeader(value = "X-User-Role",   defaultValue = "") String role,
             @Valid @RequestBody BookAppointmentRequest request) {
+        
 
         if (!"PATIENT".equalsIgnoreCase(role)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

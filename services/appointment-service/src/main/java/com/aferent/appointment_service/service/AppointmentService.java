@@ -40,9 +40,9 @@ public class AppointmentService {
         LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
 
         return slotRepository
-                .findByScheduleIdAndDateAndBookedFalse(doctorId, date)
+                .findByDoctorIdAndDate(doctorId, date)
                 .stream()
-                // filter by type just in case mixed schedules
+                .filter(s -> !s.isBooked())
                 .filter(s -> s.getType() == type)
                 .map(this::toSlotResponse)
                 .collect(Collectors.toList());
@@ -99,13 +99,14 @@ public class AppointmentService {
 
         if (available.isEmpty()) {
             throw new AppException(
-                    "No physical slots available for this date", HttpStatus.CONFLICT);
+                "No physical slots available for this date", HttpStatus.CONFLICT);
         }
 
         // Always assign the next available slot number
         GeneratedSlot slot = available.get(0);
         slot.setBooked(true);
         slotRepository.save(slot);
+        
 
         return Appointment.builder()
                 .patientId(patientId)
