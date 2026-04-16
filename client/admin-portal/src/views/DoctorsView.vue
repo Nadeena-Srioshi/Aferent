@@ -128,7 +128,7 @@ async function confirmVerify() {
   verifyError.value = null
 
   try {
-    await api.patch(`/doctors/${doctor.doctorId}/verify`)
+    await api.patch(`http://localhost:8080/admin/doctors/${doctor.doctorId}/verify`)
     // Update local state immediately — no need to re-fetch
     const idx = doctors.value.findIndex(d => d.id === doctor.id)
     if (idx !== -1) doctors.value[idx].verified = true
