@@ -9,6 +9,7 @@ import AboutView from '@/views/Aboutview.vue'
 import RecordsView from '@/views/Recordsview.vue'
 import AppointmentsView from '@/views/AppointmentsView.vue'
 import MedicalHistoryView from '@/views/MedicalHistoryView.vue'
+import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -22,6 +23,7 @@ const router = createRouter({
     { path: '/register', name: 'register', component: RegisterView },
     { path: '/profile', name: 'profile', component: ProfileView },
     { path: '/records', name: 'records', component: RecordsView },
+    { path: '/doctor-register', name: 'doctor-register', component: DoctorRegisterView },
   ],
 })
 

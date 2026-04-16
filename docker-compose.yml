@@ -223,6 +223,35 @@ services:
       DOCUMENT_SERVICE_URL: http://document-service:3009
       DOCUMENT_SERVICE_ID: patient-service
 
+  doctor-service:
+    build:
+      context: ./services/doctor-service
+    container_name: doctor-service
+    networks: [aferent-network]
+    ports:
+      - "3003:3003"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
+      PRESCRIPTION_BASE_URL: http://localhost:8080
+    volumes:
+      - ./logs/doctor-service:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   notification-service:
     build:
       context: ./services/notification-service
@@ -252,6 +281,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+  
   appointment-service:
     build:
       context: ./services/appointment-service
