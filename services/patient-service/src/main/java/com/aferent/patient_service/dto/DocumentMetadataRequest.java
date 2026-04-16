@@ -14,4 +14,5 @@ public class DocumentMetadataRequest {
     private String contentType;
     private Long fileSize;
     private String documentType;   // LAB_REPORT, PRESCRIPTION, SCAN etc
+    private String documentSubType;
 }

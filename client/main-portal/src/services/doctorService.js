@@ -67,6 +67,12 @@ export async function confirmLicenseUpload({ authId, objectKey }) {
 	})
 }
 
+export async function getDoctorById(doctorId) {
+	if (!doctorId) throw new Error('doctorId is required')
+
+	return request(`/doctors/${encodeURIComponent(doctorId)}`)
+}
+
 export default {
 	getSpecializations,
 	getHospitals,
@@ -74,4 +80,5 @@ export default {
 	completeDoctorProfile,
 	getLicenseUploadUrl,
 	confirmLicenseUpload,
+	getDoctorById,
 }

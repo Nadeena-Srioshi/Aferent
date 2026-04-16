@@ -18,4 +18,5 @@ public class MedicalReportSummaryResponse {
     private LocalDateTime uploadedAt;
     private String contentType;
     private String documentType;
+    private String documentSubType;
 }

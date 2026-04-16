@@ -49,22 +49,22 @@ public class PatientDocumentService {
         );
 
     public PresignedUrlResponse generateUploadUrlForCurrentUser(String authId, String fileName, String contentType,
-                                PatientDocumentType type, String displayName) {
+                                PatientDocumentType type, String displayName, String documentSubType) {
     Patient patient = patientRepository.findByAuthId(authId)
         .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for authenticated user"));
 
-    return generateUploadUrlInternal(patient, fileName, contentType, type, displayName);
+    return generateUploadUrlInternal(patient, fileName, contentType, type, displayName, documentSubType);
     }
 
-    public PresignedUrlResponse generateUploadUrl(String patientId, String fileName, String contentType, PatientDocumentType type) {
+    public PresignedUrlResponse generateUploadUrl(String patientId, String fileName, String contentType, PatientDocumentType type, String documentSubType) {
         Patient patient = patientRepository.findByPatientId(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
 
-    return generateUploadUrlInternal(patient, fileName, contentType, type, null);
+    return generateUploadUrlInternal(patient, fileName, contentType, type, null, documentSubType);
     }
 
     private PresignedUrlResponse generateUploadUrlInternal(Patient patient, String fileName, String contentType,
-                               PatientDocumentType type, String displayName) {
+                               PatientDocumentType type, String displayName, String documentSubType) {
     String safeFileName = (fileName == null || fileName.isBlank()) ? "file" : fileName;
     String safeContentType = (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
 
@@ -96,6 +96,7 @@ public class PatientDocumentService {
         .visibility(type.visibility())
         .category(category)
         .documentType(type.name())
+        .documentSubType(documentSubType)
         .uploadStatus(UploadStatus.PENDING_UPLOAD)
         .requestedAt(now)
         .expiresAt(now.plusHours(pendingRetentionHours))
@@ -146,6 +147,7 @@ public class PatientDocumentService {
             existing.setVisibility(visibility);
             existing.setCategory(category);
             existing.setDocumentType(type.name());
+            existing.setDocumentSubType(req.getDocumentSubType());
             existing.setUploadStatus(UploadStatus.UPLOADED);
             if (existing.getUploadedAt() == null) {
                 existing.setUploadedAt(LocalDateTime.now());
@@ -166,6 +168,7 @@ public class PatientDocumentService {
             .visibility(visibility)
             .category(category)
             .documentType(type.name())
+            .documentSubType(req.getDocumentSubType())
             .uploadStatus(UploadStatus.UPLOADED)
             .requestedAt(LocalDateTime.now())
             .uploadedAt(LocalDateTime.now())
@@ -265,6 +268,7 @@ public class PatientDocumentService {
                 .uploadedAt(doc.getUploadedAt())
                 .contentType(doc.getContentType())
                 .documentType(doc.getDocumentType())
+                .documentSubType(doc.getDocumentSubType())
                 .build())
             .toList();
     }

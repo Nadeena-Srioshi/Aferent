@@ -1,6 +1,7 @@
 package com.aferent.patient_service.service;
 
 import com.aferent.patient_service.dto.ShareDocumentsRequest;
+import com.aferent.patient_service.dto.DocumentAccessSummaryResponse;
 import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.exception.ResourceNotFoundException;
 import com.aferent.patient_service.model.Patient;
@@ -107,5 +108,29 @@ public class PatientDoctorAccessService {
 
     public boolean canDoctorAccessDocument(String patientId, String doctorAuthId, String documentId) {
         return getAllowedDocumentIds(patientId, doctorAuthId).contains(documentId);
+    }
+
+    public List<DocumentAccessSummaryResponse> getActiveAccessSummariesForPatient(String patientId, String requesterAuthId) {
+        Patient patient = patientRepository.findByPatientId(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+        if (!patient.getAuthId().equals(requesterAuthId)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        return patientDoctorAccessRepository.findByPatientIdAndActiveTrue(patientId).stream()
+                .filter(access -> access.getExpiresAt() == null || access.getExpiresAt().isAfter(now))
+                .map(access -> DocumentAccessSummaryResponse.builder()
+                        .accessId(access.getId())
+                        .doctorId(access.getDoctorId())
+                        .doctorAuthId(access.getDoctorAuthId())
+                        .appointmentId(access.getAppointmentId())
+                        .allowedDocumentIds(access.getAllowedDocumentIds())
+                        .grantedAt(access.getGrantedAt())
+                        .expiresAt(access.getExpiresAt())
+                        .active(access.isActive())
+                        .build())
+                .toList();
     }
 }

@@ -17,4 +17,6 @@ public interface PatientDoctorAccessRepository extends MongoRepository<PatientDo
     );
 
     List<PatientDoctorAccess> findByPatientIdAndDoctorAuthIdAndActiveTrue(String patientId, String doctorAuthId);
+
+    List<PatientDoctorAccess> findByPatientIdAndActiveTrue(String patientId);
 }
