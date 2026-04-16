@@ -22,6 +22,10 @@ type PresignUploadResponse struct {
 	// UploadURL is the presigned PUT URL the client should upload the file to directly.
 	UploadURL string `json:"upload_url"`
 
+	// InternalUploadURL is the raw presigned PUT URL using MINIO_ENDPOINT host.
+	// This is useful for server-to-server uploads inside Docker networks.
+	InternalUploadURL string `json:"internal_upload_url,omitempty"`
+
 	// ObjectKey is the full MinIO object path. Returned for private files so
 	// the calling service can store it and request a signed GET URL later.
 	ObjectKey string `json:"object_key,omitempty"`
