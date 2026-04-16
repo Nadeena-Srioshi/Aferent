@@ -193,11 +193,11 @@ services:
     ports:
       - "3009:3009"
     environment:
-      MINIO_ENDPOINT: nginx:9000
-      MINIO_PUBLIC_HOST: http://localhost:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: app-storage
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: "false"
       SERVER_PORT: "3009"
     depends_on:
