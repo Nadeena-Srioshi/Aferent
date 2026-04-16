@@ -6,6 +6,7 @@
     <SpecialtiesSection />
     <TrustBannerSection />
     <AiInsightsSection />
+    <DoctorSection />
     <CtaSection />
   </main>
 </template>
@@ -17,5 +18,6 @@ import HowItWorksSection  from '@/components/sections/HowItWorksSection.vue'
 import SpecialtiesSection from '@/components/sections/SpecialtiesSection.vue'
 import TrustBannerSection from '@/components/sections/TrustBannerSection.vue'
 import AiInsightsSection  from '@/components/sections/AiInsightsSection.vue'
+import DoctorSection   from '@/components/sections/DoctorSection.vue'
 import CtaSection         from '@/components/sections/CtaSection.vue'
 </script>
