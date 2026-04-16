@@ -1,6 +1,7 @@
 package com.aferent.patient_service.service;
 
 import com.aferent.patient_service.dto.DocumentMetadataRequest;
+import com.aferent.patient_service.dto.MedicalReportSummaryResponse;
 import com.aferent.patient_service.dto.PresignedUrlResponse;
 import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.exception.ResourceNotFoundException;
@@ -18,8 +19,11 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -30,12 +34,19 @@ public class PatientDocumentService {
     private final PatientRepository patientRepository;
     private final DocumentRepository documentRepository;
     private final DocumentServiceGateway documentServiceGateway;
+    private final PatientDoctorAccessService patientDoctorAccessService;
 
     @Value("${app.uploads.pending-retention-hours:24}")
     private int pendingRetentionHours;
 
     @Value("${app.uploads.bucket:app-storage}")
     private String storageBucket;
+
+        private static final List<String> MEDICAL_REPORT_TYPES = List.of(
+            PatientDocumentType.MEDICAL_REPORT.name(),
+            PatientDocumentType.PRESCRIPTION.name(),
+            PatientDocumentType.SCAN.name()
+        );
 
     public PresignedUrlResponse generateUploadUrlForCurrentUser(String authId, String fileName, String contentType,
                                 PatientDocumentType type, String displayName) {
@@ -163,16 +174,44 @@ public class PatientDocumentService {
     }
 
     public List<PatientDocument> getDocuments(String patientId, String documentType) {
+        return getDocuments(patientId, documentType, "ADMIN", null);
+    }
+
+    public List<PatientDocument> getDocuments(String patientId, String documentType, String role, String requesterAuthId) {
         patientRepository.findByPatientId(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
 
-        if (documentType == null || documentType.isBlank()) {
-            return documentRepository.findByPatientIdAndDeletedFalse(patientId);
+        boolean hasTypeFilter = documentType != null && !documentType.isBlank();
+
+        // Patient and Admin: full non-deleted view (no access filtering by document expiresAt)
+        if (!"DOCTOR".equalsIgnoreCase(role)) {
+            if (!hasTypeFilter) {
+                return documentRepository.findByPatientIdAndDeletedFalse(patientId);
+            }
+            return documentRepository.findByPatientIdAndDocumentTypeAndDeletedFalse(patientId, documentType);
         }
-        return documentRepository.findByPatientIdAndDocumentTypeAndDeletedFalse(patientId, documentType);
+
+        if (requesterAuthId == null || requesterAuthId.isBlank()) {
+            throw new ForbiddenOperationException("Doctor identity is required");
+        }
+
+        Set<String> allowedIds = patientDoctorAccessService.getAllowedDocumentIds(patientId, requesterAuthId);
+        if (allowedIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> allowedIdList = new ArrayList<>(allowedIds);
+        if (!hasTypeFilter) {
+            return documentRepository.findByPatientIdAndIdInAndDeletedFalse(patientId, allowedIdList);
+        }
+        return documentRepository.findByPatientIdAndIdInAndDocumentTypeAndDeletedFalse(patientId, allowedIdList, documentType);
     }
 
     public String getDocumentDownloadUrl(String patientId, String documentId) {
+        return getDocumentDownloadUrl(patientId, documentId, "ADMIN", null);
+    }
+
+    public String getDocumentDownloadUrl(String patientId, String documentId, String role, String requesterAuthId) {
         patientRepository.findByPatientId(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
 
@@ -181,6 +220,18 @@ public class PatientDocumentService {
         if (!doc.getPatientId().equals(patientId)) {
             throw new ForbiddenOperationException("Access denied");
         }
+
+        if ("DOCTOR".equalsIgnoreCase(role)) {
+            if (requesterAuthId == null || requesterAuthId.isBlank()) {
+                throw new ForbiddenOperationException("Doctor identity is required");
+            }
+
+            boolean hasAccess = patientDoctorAccessService.canDoctorAccessDocument(patientId, requesterAuthId, documentId);
+            if (!hasAccess) {
+                throw new ForbiddenOperationException("Doctor does not have permission to access this document");
+            }
+        }
+
         if (doc.getUploadStatus() != UploadStatus.UPLOADED) {
             throw new ForbiddenOperationException("Document is not yet available for viewing");
         }
@@ -197,7 +248,25 @@ public class PatientDocumentService {
     public String getDocumentDownloadUrlForCurrentUser(String authId, String documentId) {
         Patient patient = patientRepository.findByAuthId(authId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for authenticated user"));
-        return getDocumentDownloadUrl(patient.getPatientId(), documentId);
+        return getDocumentDownloadUrl(patient.getPatientId(), documentId, "PATIENT", authId);
+        }
+
+        public List<MedicalReportSummaryResponse> getMedicalReportsSummary(String patientId) {
+        patientRepository.findByPatientId(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+        return documentRepository.findByPatientIdAndDocumentTypeInAndDeletedFalse(patientId, MEDICAL_REPORT_TYPES)
+            .stream()
+            .filter(doc -> doc.getUploadStatus() == UploadStatus.UPLOADED)
+            .map(doc -> MedicalReportSummaryResponse.builder()
+                .documentId(doc.getId())
+                .originalFileName(doc.getOriginalFileName())
+                .displayName(doc.getDisplayName())
+                .uploadedAt(doc.getUploadedAt())
+                .contentType(doc.getContentType())
+                .documentType(doc.getDocumentType())
+                .build())
+            .toList();
     }
 
     public void deleteDocument(String patientId, String documentId) {
