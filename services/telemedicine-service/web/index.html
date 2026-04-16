@@ -3,469 +3,684 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Telemedicine Test Console</title>
+  <title>Aferent – Telemedicine E2E Console</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background: #f5f7fb; color: #111; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 980px; }
-    .card { background: #fff; border: 1px solid #dce2ef; border-radius: 12px; padding: 12px; }
-    label { display: block; margin: 6px 0 2px; font-weight: 600; }
-    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #b8c2d8; font-size: 14px; }
-    button { cursor: pointer; background: #1254ff; color: #fff; border: none; }
-    button.secondary { background: #253042; }
-    button.danger { background: #dc2626; }
-    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
-    .video-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #0f172a; color: #cbd5e1; padding: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
-    #local-video, #remote-video { width: 100%; height: 300px; background: #111827; border-radius: 10px; overflow: hidden; }
+    :root { --bg: #f5f7fb; --card: #fff; --border: #dce2ef; --primary: #1254ff; --dark: #253042; --danger: #dc2626; --green: #16a34a; --text: #111; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 16px; background: var(--bg); color: var(--text); }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    h2 { margin: 0 0 8px; font-size: 16px; }
+    h3 { margin: 0 0 6px; font-size: 14px; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .grid { display: flex; flex-direction: column; gap: 12px; max-width: 1060px; margin: 0 auto; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    label { display: block; margin: 4px 0 2px; font-weight: 600; font-size: 13px; }
+    input, select { padding: 7px 10px; border-radius: 8px; border: 1px solid #b8c2d8; font-size: 13px; width: 100%; }
+    button { cursor: pointer; padding: 8px 14px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; color: #fff; background: var(--primary); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    button.sec { background: var(--dark); }
+    button.danger { background: var(--danger); }
+    button.green { background: var(--green); }
+    button.sm { padding: 5px 10px; font-size: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    .col { flex: 1; min-width: 140px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: #0f172a; color: #cbd5e1; padding: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+    .video-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; }
+    #local-video, #remote-video { width: 100%; height: 280px; background: #111827; border-radius: 10px; overflow: hidden; }
     #local-video video, #remote-video video { width: 100%; height: 100%; object-fit: contain; }
-    .video-label { font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-    .status-badge { display: inline-block; padding: 4px 8px; background: #e8f5e9; color: #1b5e20; border-radius: 4px; font-size: 12px; font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    th, td { padding: 6px 8px; border: 1px solid #dce2ef; text-align: left; }
-    th { background: #f0f4f8; }
-    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-    .tabs button { background: #e2e8f0; color: #334155; }
-    .tabs button.active { background: #1254ff; color: #fff; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-warn { background: #fef9c3; color: #854d0e; }
+    .badge-err { background: #fee2e2; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    th, td { padding: 5px 8px; border: 1px solid var(--border); text-align: left; }
+    th { background: #f0f4f8; font-weight: 600; }
+    tr:hover { background: #f8fafc; }
+    .step { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; font-size: 13px; }
+    .step.done { background: #dcfce7; }
+    .step.active { background: #dbeafe; }
+    .step.pending { background: #f1f5f9; color: var(--muted); }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+    .step.done .step-num { background: var(--green); color: #fff; }
+    .step.active .step-num { background: var(--primary); color: #fff; }
+    .step.pending .step-num { background: #cbd5e1; color: #fff; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h1>Telemedicine Test Console</h1>
-  <p>Use this page to test the telemedicine video call API. Open on laptop and phone with the same appointment ID for a two-person call.</p>
-
   <div class="grid">
-    <!-- Auth / Mode Selection -->
-    <div class="card">
-      <h3>Connection Mode</h3>
+    <div>
+      <h1>Aferent Telemedicine – E2E Test Console</h1>
+      <p class="subtitle">Real login → browse doctors → book VIDEO appointment → doctor approve → join video call</p>
+    </div>
+
+    <!-- Progress Steps: patient view -->
+    <div class="card hidden" id="progress-card-patient">
+      <h3>Progress – Patient</h3>
+      <div class="step pending" id="step-1"><span class="step-num">1</span> Login / Register</div>
+      <div class="step pending" id="step-2"><span class="step-num">2</span> Browse Doctors &amp; Slots</div>
+      <div class="step pending" id="step-3"><span class="step-num">3</span> Book VIDEO Appointment</div>
+      <div class="step pending" id="step-4"><span class="step-num">4</span> Doctor Approves &amp; Confirm</div>
+      <div class="step pending" id="step-5"><span class="step-num">5</span> Join Video Call</div>
+    </div>
+
+    <!-- Progress Steps: doctor view -->
+    <div class="card hidden" id="progress-card-doctor">
+      <h3>Progress – Doctor</h3>
+      <div class="step active" id="dstep-1"><span class="step-num">1</span> Login</div>
+      <div class="step pending" id="dstep-2"><span class="step-num">2</span> Review Pending Requests</div>
+      <div class="step pending" id="dstep-3"><span class="step-num">3</span> Approve &amp; Confirm</div>
+      <div class="step pending" id="dstep-4"><span class="step-num">4</span> Join Video Call</div>
+    </div>
+
+    <!-- Doctor Dashboard -->
+    <div class="card hidden" id="card-doctor">
+      <h2>Doctor Dashboard</h2>
+      <div class="row" style="margin-bottom:10px;">
+        <button class="sec" onclick="loadPendingVideo()">Refresh Pending Requests</button>
+        <button class="sec" onclick="loadDoctorConfirmed()">Refresh Confirmed Calls</button>
+      </div>
+      <h3>Pending Approval (PENDING_DOCTOR_APPROVAL)</h3>
+      <div id="drPendingList"><p style="color:var(--muted);font-size:12px;">Click refresh to load.</p></div>
+      <h3 style="margin-top:14px;">Confirmed Video Appointments (ready to join)</h3>
+      <div id="drConfirmedList"><p style="color:var(--muted);font-size:12px;">Click refresh to load.</p></div>
+    </div>
+
+    <!-- Step 1: Auth -->
+    <div class="card" id="card-auth">
+      <h2>Step 1 – Login or Register</h2>
       <div class="row">
-        <div>
-          <label>Mode</label>
-          <select id="connMode" onchange="toggleMode()">
-            <option value="direct">Direct (port 3006, no auth)</option>
-            <option value="gateway">Gateway (port 8080, JWT auth)</option>
-          </select>
-        </div>
-        <div>
-          <label>Gateway URL</label>
-          <input id="gatewayUrl" value="http://localhost:8080" />
+        <div class="col"><label>Gateway URL</label><input id="gw" /></div>
+        <div class="col"><label>Email</label><input id="authEmail" placeholder="user@example.com" /></div>
+        <div class="col"><label>Password</label><input id="authPass" type="password" /></div>
+        <div class="col"><label>Role (register only)</label>
+          <select id="authRole"><option>PATIENT</option><option>DOCTOR</option></select>
         </div>
       </div>
-      <div id="authPanel" style="margin-top:10px; display:none;">
+      <div class="row" style="margin-top:10px;">
+        <button onclick="doLogin()">Login</button>
+        <button class="sec" onclick="doRegister()">Register</button>
+      </div>
+      <p id="authMsg" style="font-size:12px; margin-top:6px;"></p>
+    </div>
+
+    <!-- Step 2: Browse Doctors & Slots -->
+    <div class="card hidden" id="card-browse">
+      <h2>Step 2 – Browse Doctors &amp; Available Video Slots</h2>
+      <div class="row">
+        <button class="sec" onclick="loadDoctors()">Load Active Doctors</button>
+      </div>
+      <div id="doctorList"></div>
+      <div id="slotSection" class="hidden" style="margin-top:10px;">
+        <h3>Video Slots for <span id="selectedDoctorName"></span></h3>
         <div class="row">
-          <div>
-            <label>Email</label>
-            <input id="authEmail" value="" placeholder="user@example.com" />
-          </div>
-          <div>
-            <label>Password</label>
-            <input id="authPassword" type="password" value="" />
-          </div>
-          <button id="loginBtn" style="align-self:flex-end;">Login</button>
-          <button id="registerBtn" class="secondary" style="align-self:flex-end;">Register</button>
+          <div class="col"><label>Date</label><input id="slotDate" type="date" /></div>
+          <button class="sec" onclick="loadSlots()" style="align-self:flex-end;">Load Slots</button>
         </div>
-        <div class="row" style="margin-top:6px;">
-          <div>
-            <label>Register Role</label>
-            <select id="registerRole">
-              <option>PATIENT</option>
-              <option>DOCTOR</option>
-            </select>
-          </div>
-        </div>
-        <p id="authStatus" style="font-size:13px; color:#555;"></p>
+        <div id="slotList" style="margin-top:6px;"></div>
       </div>
     </div>
 
-    <!-- Session Controls -->
-    <div class="card">
+    <!-- Step 3: Book -->
+    <div class="card hidden" id="card-book">
+      <h2>Step 3 – Book VIDEO Appointment</h2>
       <div class="row">
-        <div>
-          <label>Appointment ID</label>
-          <input id="appointmentId" value="appt-001" />
-        </div>
-        <div>
-          <label>User ID</label>
-          <input id="userId" value="doctor-001" />
-        </div>
-        <div>
-          <label>Role</label>
-          <select id="role">
-            <option>DOCTOR</option>
-            <option>PATIENT</option>
-          </select>
-        </div>
-        <div>
-          <label>Email</label>
-          <input id="email" value="doctor@example.com" />
-        </div>
+        <div class="col"><label>Doctor ID</label><input id="bookDoctorId" readonly /></div>
+        <div class="col"><label>Schedule ID</label><input id="bookScheduleId" readonly /></div>
+        <div class="col"><label>Date</label><input id="bookDate" readonly /></div>
+        <div class="col"><label>Video Slot ID</label><input id="bookSlotId" readonly /></div>
       </div>
-      <div class="row" style="margin-top:10px">
-        <button id="joinBtn">Join Session</button>
-        <button id="statusBtn" class="secondary">Check Status</button>
-        <button id="remainingBtn" class="secondary">Remaining Time</button>
-        <button id="endBtn" class="danger">End Session</button>
+      <div class="row" style="margin-top:6px;">
+        <div class="col"><label>Slot Time</label><input id="bookSlotTime" readonly /></div>
+        <div class="col"><label>Doctor Name</label><input id="bookDoctorName" /></div>
+        <div class="col"><label>Patient Name</label><input id="bookPatientName" /></div>
       </div>
-      <div class="row" style="margin-top:10px">
-        <label><input id="publishAudio" type="checkbox" checked /> Publish Audio</label>
-        <label><input id="publishVideo" type="checkbox" checked /> Publish Video</label>
+      <div class="row" style="margin-top:10px;">
+        <button class="green" onclick="bookAppointment()">Book Appointment</button>
       </div>
-      <p id="statusText"></p>
+      <p id="bookMsg" style="font-size:12px; margin-top:6px;"></p>
     </div>
 
-    <!-- Duration Controls -->
-    <div class="card">
-      <h3>Duration Controls (Doctor/Admin only)</h3>
+    <!-- Step 4: Doctor Approval Flow -->
+    <div class="card hidden" id="card-approve">
+      <h2>Step 4 – Appointment Status &amp; Doctor Approval</h2>
+      <p style="font-size:12px; color:var(--muted);">
+        VIDEO appointments start as PENDING_DOCTOR_APPROVAL. Log in as the doctor in another browser tab to approve,
+        or use the quick-approve below (requires doctor credentials).
+      </p>
       <div class="row">
-        <div>
-          <label>New Duration (seconds)</label>
-          <input id="newDuration" type="number" value="3600" min="60" />
+        <div class="col"><label>Appointment ID</label><input id="apptId" readonly /></div>
+        <div class="col"><label>Status</label><input id="apptStatus" readonly /></div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button class="sec" onclick="refreshAppointment()">Refresh Status</button>
+        <button class="green" onclick="quickApprove()">Quick-Approve (as Doctor)</button>
+      </div>
+      <div id="approveSection" class="hidden" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <h3>Doctor Quick-Approve</h3>
+        <div class="row">
+          <div class="col"><label>Doctor Email</label><input id="drEmail" /></div>
+          <div class="col"><label>Doctor Password</label><input id="drPass" type="password" /></div>
+          <button class="green" onclick="doQuickApprove()" style="align-self:flex-end;">Approve &amp; Confirm</button>
         </div>
-        <div>
-          <label>Reason</label>
-          <input id="durationReason" value="need more time" />
-        </div>
-        <button id="updateDurationBtn" class="secondary" style="align-self:flex-end;">Update Duration</button>
+        <p id="approveMsg" style="font-size:12px; margin-top:4px;"></p>
       </div>
     </div>
 
-    <!-- Video Preview -->
-    <div class="card">
-      <h3>Video Preview</h3>
+    <!-- Step 5: Video Call -->
+    <div class="card hidden" id="card-video">
+      <h2>Step 5 – Video Call</h2>
+      <div class="row">
+        <div class="col"><label>Appointment ID</label><input id="vidApptId" readonly /></div>
+        <div class="col"><label>Your Role</label><input id="vidRole" readonly /></div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button onclick="joinCall()">Join Video Call</button>
+        <button class="sec" onclick="checkCallStatus()">Check Status</button>
+        <button class="danger" onclick="endCall()">End Call</button>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <label style="display:inline;"><input id="pubAudio" type="checkbox" checked /> Audio</label>
+        <label style="display:inline;"><input id="pubVideo" type="checkbox" checked /> Video</label>
+      </div>
+      <p id="vidMsg" style="font-size:12px; margin-top:4px;"></p>
       <div class="video-row">
         <div>
-          <div class="video-label">Local <span class="status-badge" id="localAudioStatus"></span></div>
+          <div style="font-weight:600; margin-bottom:4px;">You <span class="badge badge-ok" id="localBadge"></span></div>
           <div id="local-video"></div>
         </div>
         <div>
-          <div class="video-label">Remote <span class="status-badge" id="remoteAudioStatus"></span> <button id="muteBtn" style="padding: 4px 8px; font-size: 12px; margin-left: auto;">Mute</button></div>
+          <div style="font-weight:600; margin-bottom:4px;">Remote <span class="badge badge-ok" id="remoteBadge"></span>
+            <button class="sm sec" id="muteBtn" onclick="toggleMute()">Mute</button>
+          </div>
           <div id="remote-video"></div>
         </div>
       </div>
-      <p style="margin-top:8px; font-size: 12px; color: #666;">If token starts with "dev-", Agora credentials are not configured. API still works but video will not connect.</p>
     </div>
 
-    <!-- Tabs: History / Webhook Test -->
-    <div class="card">
-      <div class="tabs">
-        <button class="active" onclick="switchTab(this, 'history')">Session History</button>
-        <button onclick="switchTab(this, 'webhook')">Webhook Test</button>
-      </div>
-
-      <div id="tab-history" class="tab-content active">
-        <div class="row">
-          <div>
-            <label>Patient ID (optional)</label>
-            <input id="histPatientId" value="" placeholder="leave empty for all" />
-          </div>
-          <div>
-            <label>Doctor ID (optional)</label>
-            <input id="histDoctorId" value="" placeholder="leave empty for all" />
-          </div>
-          <button id="historyBtn" class="secondary" style="align-self:flex-end;">Load History</button>
-        </div>
-        <div id="historyResult"></div>
-      </div>
-
-      <div id="tab-webhook" class="tab-content">
-        <p style="font-size:13px; color:#555;">Simulate an Agora webhook event. No signature check needed if AGORA_WEBHOOK_SECRET is empty.</p>
-        <div class="row">
-          <div>
-            <label>Event Type</label>
-            <select id="webhookType">
-              <option value="participant_joined">participant_joined</option>
-              <option value="participant_left">participant_left</option>
-              <option value="recording_ready">recording_ready</option>
-            </select>
-          </div>
-          <div>
-            <label>User ID</label>
-            <input id="webhookUserId" value="doctor-001" />
-          </div>
-          <div>
-            <label>Role</label>
-            <input id="webhookRole" value="DOCTOR" />
-          </div>
-          <button id="sendWebhookBtn" class="secondary" style="align-self:flex-end;">Send Webhook</button>
-        </div>
-      </div>
+    <!-- My Appointments (utility) -->
+    <div class="card hidden" id="card-myappts">
+      <h2>My Appointments</h2>
+      <button class="sec" onclick="loadMyAppointments()">Refresh</button>
+      <div id="myApptList" style="margin-top:6px;"></div>
     </div>
 
     <!-- Debug Log -->
     <div class="card">
-      <h3>Debug Log</h3>
-      <button onclick="document.getElementById('debug').textContent=''" class="secondary" style="font-size:12px;margin-bottom:6px;">Clear</button>
-      <div id="debug" class="mono"></div>
+      <h3>Debug Log <button class="sm sec" onclick="document.getElementById('dbg').textContent=''">Clear</button></h3>
+      <div id="dbg" class="mono"></div>
     </div>
   </div>
 
   <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
   <script>
-    const debug = (msg, obj) => {
-      const el = document.getElementById('debug');
-      const line = '[' + new Date().toISOString() + '] ' + msg + (obj ? '\n' + JSON.stringify(obj, null, 2) : '');
-      el.textContent = line + '\n\n' + el.textContent;
-      console.log(msg, obj || '');
-    };
+  /* ── state ────────────────────────────────────────────── */
+  let jwt = '', userId = '', userRole = '', userEmail = '';
+  let selectedDoctor = null, selectedSlot = null, currentApptId = '';
+  let agoraClient = null, localTracks = [], joined = false;
+  let remoteAudioMuted = false, remoteAudioTrack = null;
 
-    function switchTab(btn, name) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + name).classList.add('active');
-      btn.classList.add('active');
+  /* ── helpers ──────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+  // Default gateway URL: localhost always uses port 8080 (api-gateway).
+  // For non-localhost (e.g. cloudflare tunnel), the tunnel must point to port 8080 and window.location.origin is correct.
+  const gwInput = document.getElementById('gw');
+  (function() {
+    const loc = window.location;
+    if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') {
+      gwInput.value = loc.protocol + '//' + loc.hostname + ':8080';
+    } else {
+      gwInput.value = loc.origin;
     }
-
-    let jwtToken = '', authUserId = '', authUserRole = '';
-
-    function toggleMode() {
-      const mode = document.getElementById('connMode').value;
-      document.getElementById('authPanel').style.display = mode === 'gateway' ? 'block' : 'none';
+  })();
+  const gw = () => $('gw').value.replace(/\/$/,'');
+  const log = (msg, obj) => {
+    const el = $('dbg');
+    const t = new Date().toISOString().slice(11,23);
+    el.textContent = '[' + t + '] ' + msg + (obj ? '\n' + JSON.stringify(obj,null,2) : '') + '\n\n' + el.textContent;
+  };
+  const authHeaders = () => {
+    const h = { 'Content-Type': 'application/json' };
+    if (jwt) h['Authorization'] = 'Bearer ' + jwt;
+    return h;
+  };
+  const show = id => $(id).classList.remove('hidden');
+  const hide = id => $(id).classList.add('hidden');
+  const setStep = n => {
+    for (let i = 1; i <= 5; i++) {
+      const el = $('step-' + i);
+      el.className = 'step ' + (i < n ? 'done' : i === n ? 'active' : 'pending');
     }
+  };
 
-    function baseUrl() {
-      return document.getElementById('connMode').value === 'gateway'
-        ? document.getElementById('gatewayUrl').value.replace(/\/$/, '')
-        : '';
+  async function api(method, path, body) {
+    const opts = { method, headers: authHeaders() };
+    if (body) opts.body = JSON.stringify(body);
+    const url = gw() + path;
+    log(method + ' ' + path);
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) {
+      log('ERROR ' + res.status, data);
+      throw new Error(typeof data === 'string' ? data : JSON.stringify(data));
     }
+    return data;
+  }
 
-    const headers = () => {
-      const mode = document.getElementById('connMode').value;
-      const h = { 'Content-Type': 'application/json' };
-      if (mode === 'gateway') {
-        if (jwtToken) h['Authorization'] = 'Bearer ' + jwtToken;
-      } else {
-        h['X-User-ID'] = document.getElementById('userId').value;
-        h['X-User-Role'] = document.getElementById('role').value;
-        h['X-User-Email'] = document.getElementById('email').value;
+  /* ── step 1: auth ────────────────────────────────────── */
+  async function doLogin() {
+    try {
+      const data = await api('POST', '/auth/login', {
+        email: $('authEmail').value,
+        password: $('authPass').value,
+      });
+      jwt = data.accessToken;
+      userId = data.authId;
+      userRole = data.role;
+      userEmail = $('authEmail').value;
+      $('authMsg').textContent = 'Logged in as ' + data.role + ' (id=' + data.authId + ')';
+      $('authMsg').style.color = 'green';
+      log('login OK', { authId: data.authId, role: data.role });
+      afterAuth();
+    } catch (e) { $('authMsg').textContent = e.message; $('authMsg').style.color = 'red'; }
+  }
+
+  async function doRegister() {
+    try {
+      const data = await api('POST', '/auth/register', {
+        email: $('authEmail').value,
+        password: $('authPass').value,
+        role: $('authRole').value,
+      });
+      jwt = data.accessToken;
+      userId = data.authId;
+      userRole = data.role;
+      userEmail = $('authEmail').value;
+      $('authMsg').textContent = 'Registered as ' + data.role + ' (id=' + data.authId + ')';
+      $('authMsg').style.color = 'green';
+      log('register OK', { authId: data.authId, role: data.role });
+      afterAuth();
+    } catch (e) { $('authMsg').textContent = e.message; $('authMsg').style.color = 'red'; }
+  }
+
+  function afterAuth() {
+    if (userRole === 'DOCTOR') {
+      afterAuthDoctor();
+    } else {
+      afterAuthPatient();
+    }
+  }
+
+  function afterAuthPatient() {
+    show('progress-card-patient');
+    hide('progress-card-doctor');
+    setStep(2);
+    show('card-browse');
+    show('card-myappts');
+    loadDoctors();
+  }
+
+  function afterAuthDoctor() {
+    hide('progress-card-patient');
+    show('progress-card-doctor');
+    setDoctorStep(2);
+    show('card-doctor');
+    show('card-video');
+    loadPendingVideo();
+    loadDoctorConfirmed();
+  }
+
+  function setDoctorStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const el = $('dstep-' + i);
+      if (el) el.className = 'step ' + (i < n ? 'done' : i === n ? 'active' : 'pending');
+    }
+  }
+
+  /* ── step 2: browse doctors & slots ─────────────────── */
+  async function loadDoctors() {
+    try {
+      const docs = await api('GET', '/doctors');
+      if (!docs || docs.length === 0) {
+        $('doctorList').innerHTML = '<p style="color:var(--muted)">No active doctors found.</p>';
+        return;
       }
-      return h;
-    };
+      let html = '<table><tr><th>Doctor ID</th><th>Name</th><th>Specialization</th><th>Fee</th><th></th></tr>';
+      for (const d of docs) {
+        const name = ((d.firstName||'') + ' ' + (d.lastName||'')).trim() || d.doctorId;
+        const escapedName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        html += '<tr><td>' + d.doctorId + '</td><td>' + name + '</td>'
+          + '<td>' + (d.specialization||'-') + '</td><td>' + (d.consultationFee||'-') + '</td>'
+          + '<td><button class="sm sec" onclick="selectDoctor(\'' + d.doctorId + '\',\'' + escapedName + '\')">View Slots</button></td></tr>';
+      }
+      $('doctorList').innerHTML = html + '</table>';
+      log('loaded ' + docs.length + ' doctors');
+    } catch (e) { $('doctorList').innerHTML = '<p style="color:red">' + e.message + '</p>'; }
+  }
 
-    async function doLogin() {
-      try {
-        const gw = document.getElementById('gatewayUrl').value.replace(/\/$/, '');
-        const res = await fetch(gw + '/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('authEmail').value,
-            password: document.getElementById('authPassword').value,
-          }),
+  function selectDoctor(doctorId, name) {
+    selectedDoctor = { doctorId, name };
+    $('selectedDoctorName').textContent = name + ' (' + doctorId + ')';
+    show('slotSection');
+    // Default date to next Monday
+    const d = new Date();
+    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+    $('slotDate').value = d.toISOString().split('T')[0];
+    loadSlots();
+  }
+
+  async function loadSlots() {
+    if (!selectedDoctor) return;
+    const date = $('slotDate').value;
+    if (!date) { $('slotList').innerHTML = '<p style="color:red">Pick a date</p>'; return; }
+    try {
+      const slots = await api('GET', '/appointments/slots/doctor/' + selectedDoctor.doctorId + '?type=VIDEO&date=' + date);
+      if (!slots || slots.length === 0) {
+        $('slotList').innerHTML = '<p style="color:var(--muted)">No available VIDEO slots on ' + date + '. Try another date (check doctor schedule days).</p>';
+        return;
+      }
+      let html = '<table><tr><th>Video Slot</th><th>Time</th><th>Fee</th><th></th></tr>';
+      for (const s of slots) {
+        const sJson = JSON.stringify(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        html += '<tr><td>' + (s.videoSlotId||'-') + '</td>'
+          + '<td>' + s.startTime + ' – ' + s.endTime + '</td>'
+          + '<td>' + s.consultationFee + '</td>'
+          + '<td><button class="sm green" onclick=\'pickSlot(' + JSON.stringify(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + ')\'>Select</button></td></tr>';
+      }
+      $('slotList').innerHTML = html + '</table>';
+      log('found ' + slots.length + ' VIDEO slots on ' + date);
+    } catch (e) { $('slotList').innerHTML = '<p style="color:red">' + e.message + '</p>'; }
+  }
+
+  function pickSlot(slot) {
+    selectedSlot = slot;
+    show('card-book');
+    $('bookDoctorId').value = selectedDoctor.doctorId;
+    $('bookScheduleId').value = slot.scheduleId;
+    $('bookDate').value = $('slotDate').value;
+    $('bookSlotId').value = slot.videoSlotId;
+    $('bookSlotTime').value = slot.startTime + ' – ' + slot.endTime;
+    $('bookDoctorName').value = selectedDoctor.name;
+    $('bookPatientName').value = userEmail ? userEmail.split('@')[0] : '';
+    setStep(3);
+  }
+
+  /* ── step 3: book appointment ───────────────────────── */
+  async function bookAppointment() {
+    try {
+      const body = {
+        doctorId: $('bookDoctorId').value,
+        scheduleId: $('bookScheduleId').value,
+        type: 'VIDEO',
+        appointmentDate: $('bookDate').value,
+        videoSlotId: $('bookSlotId').value,
+        doctorName: $('bookDoctorName').value,
+        patientName: $('bookPatientName').value,
+      };
+      const data = await api('POST', '/appointments', body);
+      currentApptId = data.id;
+      $('bookMsg').textContent = 'Booked! ID=' + data.id + ' Status=' + data.status;
+      $('bookMsg').style.color = 'green';
+      log('appointment booked', { id: data.id, status: data.status, type: data.type });
+
+      // Move to step 4
+      show('card-approve');
+      $('apptId').value = data.id;
+      $('apptStatus').value = data.status;
+      setStep(4);
+    } catch (e) {
+      $('bookMsg').textContent = e.message;
+      $('bookMsg').style.color = 'red';
+    }
+  }
+
+  /* ── step 4: doctor approval ────────────────────────── */
+  async function refreshAppointment() {
+    if (!currentApptId) return;
+    try {
+      const data = await api('GET', '/appointments/' + currentApptId);
+      $('apptStatus').value = data.status;
+      log('appointment status', { id: data.id, status: data.status });
+      if (data.status === 'CONFIRMED') {
+        setStep(5);
+        show('card-video');
+        $('vidApptId').value = currentApptId;
+        $('vidRole').value = userRole;
+      }
+    } catch (e) { log('refresh error', { message: e.message }); }
+  }
+
+  function quickApprove() {
+    show('approveSection');
+  }
+
+  async function doQuickApprove() {
+    try {
+      // Login as doctor
+      const auth = await api('POST', '/auth/login', {
+        email: $('drEmail').value,
+        password: $('drPass').value,
+      });
+      if (auth.role !== 'DOCTOR') throw new Error('Account is not a DOCTOR role');
+      const drToken = auth.accessToken;
+      log('doctor login OK', { authId: auth.authId });
+
+      // Approve the appointment (ACCEPTED_PENDING_PAYMENT)
+      const approveRes = await fetch(gw() + '/appointments/' + currentApptId + '/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + drToken },
+        body: JSON.stringify({ status: 'ACCEPTED_PENDING_PAYMENT' }),
+      });
+      if (!approveRes.ok) throw new Error('Approve failed: ' + await approveRes.text());
+      const approveData = await approveRes.json();
+      log('doctor approved', { status: approveData.status });
+
+      // In production, payment-service handles ACCEPTED_PENDING_PAYMENT → CONFIRMED.
+      // For testing, we skip payment and directly confirm via doctor.
+      const confirmRes = await fetch(gw() + '/appointments/' + currentApptId + '/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + drToken },
+        body: JSON.stringify({ status: 'CONFIRMED' }),
+      });
+      if (!confirmRes.ok) throw new Error('Confirm failed: ' + await confirmRes.text());
+      const confirmData = await confirmRes.json();
+      $('apptStatus').value = confirmData.status;
+      $('approveMsg').textContent = 'Approved & Confirmed! Ready for video call.';
+      $('approveMsg').style.color = 'green';
+      log('appointment confirmed', { status: confirmData.status });
+
+      setStep(5);
+      show('card-video');
+      $('vidApptId').value = currentApptId;
+      $('vidRole').value = userRole;
+    } catch (e) {
+      $('approveMsg').textContent = e.message;
+      $('approveMsg').style.color = 'red';
+    }
+  }
+
+  /* ── step 5: video call ─────────────────────────────── */
+  async function joinCall() {
+    const id = $('vidApptId').value || currentApptId;
+    if (!id) { $('vidMsg').textContent = 'No appointment ID'; return; }
+    try {
+      const data = await api('POST', '/sessions/join/' + id);
+      log('join response', data);
+      $('vidMsg').textContent = 'Session: ' + data.status + ', otherJoined=' + data.otherParticipantJoined;
+      $('vidMsg').style.color = 'green';
+
+      if (!data.appId || !data.token || data.token.startsWith('dev-')) {
+        log('Dev token — Agora credentials not set. API flow works but video will not connect.');
+        $('vidMsg').textContent += ' (dev token — no real video, but API works)';
+        return;
+      }
+
+      // Agora video connect
+      if (!agoraClient) {
+        agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        agoraClient.on('user-published', async (user, mediaType) => {
+          try {
+            await agoraClient.subscribe(user, mediaType);
+            log('subscribed remote', { uid: user.uid, mediaType });
+            if (mediaType === 'video' && user.videoTrack) { user.videoTrack.play('remote-video'); $('remoteBadge').textContent = 'Video ON'; }
+            if (mediaType === 'audio' && user.audioTrack) { remoteAudioTrack = user.audioTrack; user.audioTrack.play(); $('remoteBadge').textContent += ' Audio ON'; }
+          } catch (e) { log('subscribe error: ' + e.message); }
         });
-        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
-        const data = await res.json();
-        jwtToken = data.accessToken;
-        authUserId = data.authId;
-        authUserRole = data.role;
-        document.getElementById('authStatus').textContent = 'Logged in as ' + data.role + ' (id=' + data.authId + ')';
-        document.getElementById('userId').value = data.authId;
-        document.getElementById('role').value = data.role;
-        document.getElementById('email').value = document.getElementById('authEmail').value;
-        debug('login success', { authId: data.authId, role: data.role });
-      } catch (e) { debug('login error', { message: e.message }); }
-    }
-
-    async function doRegister() {
-      try {
-        const gw = document.getElementById('gatewayUrl').value.replace(/\/$/, '');
-        const res = await fetch(gw + '/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('authEmail').value,
-            password: document.getElementById('authPassword').value,
-            role: document.getElementById('registerRole').value,
-          }),
+        agoraClient.on('user-unpublished', (user, mediaType) => {
+          if (mediaType === 'audio') remoteAudioTrack = null;
+          $('remoteBadge').textContent = '';
         });
-        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
-        const data = await res.json();
-        jwtToken = data.accessToken;
-        authUserId = data.authId;
-        authUserRole = data.role;
-        document.getElementById('authStatus').textContent = 'Registered and logged in as ' + data.role + ' (id=' + data.authId + ')';
-        document.getElementById('userId').value = data.authId;
-        document.getElementById('role').value = data.role;
-        document.getElementById('email').value = document.getElementById('authEmail').value;
-        debug('register success', { authId: data.authId, role: data.role });
-      } catch (e) { debug('register error', { message: e.message }); }
-    }
+        agoraClient.on('user-left', () => { remoteAudioTrack = null; $('remoteBadge').textContent = 'Left'; });
+      }
 
-    let client = null, localTracks = [], joined = false, remoteAudioMuted = false, remoteAudioElement = null;
-    let playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
+      await agoraClient.join(data.appId, data.channelName, data.token, data.uid);
+      joined = true;
 
-    function updatePlaybackStatus() {
-      document.getElementById('localAudioStatus').textContent = playbackStatus.localAudio ? 'Audio ON' : '';
-      document.getElementById('remoteAudioStatus').textContent = playbackStatus.remoteAudio ? 'Audio ON' : '';
-    }
+      const tracks = [];
+      if ($('pubAudio').checked) {
+        try { const mic = await AgoraRTC.createMicrophoneAudioTrack(); tracks.push(mic); } catch (e) { log('mic error: ' + e.message); }
+      }
+      if ($('pubVideo').checked) {
+        try { const cam = await AgoraRTC.createCameraVideoTrack(); tracks.push(cam); cam.play('local-video'); } catch (e) { log('camera error (may be in use): ' + e.message); }
+      }
+      localTracks = tracks;
+      if (tracks.length > 0) {
+        await agoraClient.publish(tracks);
+        $('localBadge').textContent = tracks.length + ' track(s)';
+        log('published ' + tracks.length + ' track(s)');
+      }
+    } catch (e) { $('vidMsg').textContent = e.message; $('vidMsg').style.color = 'red'; }
+  }
 
-    async function clearLocalTracks() {
-      for (const t of localTracks) { try { t.stop(); } catch (_) {} try { t.close(); } catch (_) {} }
+  async function checkCallStatus() {
+    const id = $('vidApptId').value || currentApptId;
+    if (!id) return;
+    try {
+      const data = await api('GET', '/sessions/' + id + '/status');
+      $('vidMsg').textContent = 'doctor=' + data.doctorJoined + ' patient=' + data.patientJoined + ' remaining=' + data.remainingDurationSec + 's status=' + data.status;
+      $('vidMsg').style.color = '';
+      log('call status', data);
+    } catch (e) { $('vidMsg').textContent = e.message; $('vidMsg').style.color = 'red'; }
+  }
+
+  async function endCall() {
+    const id = $('vidApptId').value || currentApptId;
+    if (!id) return;
+    try {
+      const data = await api('POST', '/sessions/' + id + '/end');
+      log('call ended', data);
+      $('vidMsg').textContent = 'Call ended';
+      $('vidMsg').style.color = '';
+      for (const t of localTracks) { try { t.stop(); t.close(); } catch(_){} }
       localTracks = [];
-    }
+      if (agoraClient && joined) { try { await agoraClient.leave(); joined = false; } catch(_){} }
+      $('localBadge').textContent = '';
+      $('remoteBadge').textContent = '';
+    } catch (e) { $('vidMsg').textContent = e.message; $('vidMsg').style.color = 'red'; }
+  }
 
-    async function joinSession() {
-      const id = document.getElementById('appointmentId').value;
-      try {
-        const res = await fetch(baseUrl() + '/sessions/join/' + id, { method: 'POST', headers: headers() });
-        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
-        const data = await res.json();
-        debug('join response', data);
-        document.getElementById('statusText').textContent = 'Session: ' + data.status + ', otherJoined=' + data.otherParticipantJoined;
-        if (!data.appId || !data.token || data.token.startsWith('dev-')) { debug('Dev token — video will not connect'); return; }
-        if (!client) {
-          client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-          client.on('user-published', async (user, mediaType) => {
-            try {
-              await client.subscribe(user, mediaType);
-              debug('subscribed', { uid: user.uid, mediaType });
-              if (mediaType === 'video' && user.videoTrack) { user.videoTrack.play('remote-video'); playbackStatus.remoteVideo = true; }
-              if (mediaType === 'audio' && user.audioTrack) { remoteAudioElement = user.audioTrack; user.audioTrack.play(); playbackStatus.remoteAudio = true; }
-              updatePlaybackStatus();
-            } catch (e) { debug('subscribe error', { message: e.message }); }
-          });
-          client.on('user-unpublished', (user, mediaType) => {
-            if (mediaType === 'audio') { remoteAudioElement = null; playbackStatus.remoteAudio = false; }
-            if (mediaType === 'video') { playbackStatus.remoteVideo = false; }
-            updatePlaybackStatus();
-          });
-          client.on('user-left', () => {
-            remoteAudioElement = null; playbackStatus.remoteAudio = false; playbackStatus.remoteVideo = false; updatePlaybackStatus();
-          });
-        }
-        await client.join(data.appId, data.channelName, data.token, data.uid);
-        joined = true;
-        const pubA = document.getElementById('publishAudio').checked, pubV = document.getElementById('publishVideo').checked;
-        if (pubA || pubV) {
-          const tracks = [];
-          // Create mic and camera separately so a camera failure doesn't block audio.
-          // On Linux, two browsers cannot share the same camera — the second one will
-          // get NotReadableError. Audio still publishes so the other participant can hear you.
-          if (pubA) {
-            try {
-              const mic = await AgoraRTC.createMicrophoneAudioTrack();
-              tracks.push(mic);
-              playbackStatus.localAudio = true;
-            } catch (e) { debug('mic unavailable: ' + e.message); }
-          }
-          if (pubV) {
-            try {
-              const cam = await AgoraRTC.createCameraVideoTrack();
-              tracks.push(cam);
-              cam.play('local-video');
-              playbackStatus.localVideo = true;
-            } catch (e) { debug('camera unavailable (may be in use by another tab/browser on this machine): ' + e.message); }
-          }
-          localTracks = tracks;
-          if (tracks.length > 0) {
-            try {
-              await client.publish(tracks);
-              debug('published ' + tracks.length + ' track(s)' + (playbackStatus.localVideo ? ' [audio+video]' : ' [audio only — camera in use]'));
-            } catch (e) { debug('publish error', { message: e.message }); }
-          } else {
-            debug('no tracks published — check mic/camera permissions');
-          }
-          updatePlaybackStatus();
-        }
-      } catch (e) { debug('join error', { message: e.message }); }
-    }
+  function toggleMute() {
+    remoteAudioMuted = !remoteAudioMuted;
+    $('muteBtn').textContent = remoteAudioMuted ? 'Unmute' : 'Mute';
+    if (remoteAudioTrack) remoteAudioTrack.setVolume(remoteAudioMuted ? 0 : 100);
+    log('remote muted: ' + remoteAudioMuted);
+  }
+  /* ── doctor dashboard ──────────────────────────── */
+  async function loadPendingVideo() {
+    try {
+      const data = await api('GET', '/appointments/pending-video');
+      if (!data || data.length === 0) {
+        $('drPendingList').innerHTML = '<p style="color:var(--muted);font-size:12px;">No pending video requests.</p>';
+        return;
+      }
+      let html = '<table><tr><th>ID</th><th>Date</th><th>Slot</th><th>Patient</th><th></th></tr>';
+      for (const a of data) {
+        html += '<tr>'
+          + '<td style="font-size:10px">' + a.id + '</td>'
+          + '<td>' + a.appointmentDate + '</td>'
+          + '<td>' + (a.videoSlotStart||'') + '–' + (a.videoSlotEnd||'') + '</td>'
+          + '<td>' + (a.patientName||a.patientId||'-') + '</td>'
+          + '<td><button class="sm green" onclick="approveAndConfirm(&#39;' + a.id + '&#39;)">Approve &amp; Confirm</button></td>'
+          + '</tr>';
+      }
+      $('drPendingList').innerHTML = html + '</table>';
+      setDoctorStep(2);
+    } catch (e) { $('drPendingList').innerHTML = '<p style="color:red">' + e.message + '</p>'; }
+  }
 
-    async function checkStatus() {
-      try {
-        const id = document.getElementById('appointmentId').value;
-        const res = await fetch(baseUrl() + '/sessions/' + id + '/status', { headers: headers() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        debug('status', data);
-        document.getElementById('statusText').textContent = 'doctor=' + data.doctorJoined + ' patient=' + data.patientJoined + ' remaining=' + data.remainingDurationSec + 's status=' + data.status;
-      } catch (e) { debug('status error', { message: e.message }); }
-    }
+  async function approveAndConfirm(apptId) {
+    try {
+      await api('PATCH', '/appointments/' + apptId + '/status', { status: 'ACCEPTED_PENDING_PAYMENT' });
+      log('approved', { apptId });
+      await api('PATCH', '/appointments/' + apptId + '/status', { status: 'CONFIRMED' });
+      log('confirmed', { apptId });
+      setDoctorStep(3);
+      await loadPendingVideo();
+      await loadDoctorConfirmed();
+    } catch (e) { log('approve error: ' + e.message); }
+  }
 
-    async function checkRemaining() {
-      try {
-        const id = document.getElementById('appointmentId').value;
-        const res = await fetch(baseUrl() + '/sessions/' + id + '/remaining-duration', { headers: headers() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        debug('remaining', await res.json());
-      } catch (e) { debug('remaining error', { message: e.message }); }
-    }
+  async function loadDoctorConfirmed() {
+    try {
+      const data = await api('GET', '/appointments');
+      const confirmed = (data || []).filter(a => a.type === 'VIDEO' && a.status === 'CONFIRMED');
+      if (confirmed.length === 0) {
+        $('drConfirmedList').innerHTML = '<p style="color:var(--muted);font-size:12px;">No confirmed video calls yet.</p>';
+        return;
+      }
+      let html = '<table><tr><th>ID</th><th>Date</th><th>Slot</th><th>Patient</th><th></th></tr>';
+      for (const a of confirmed) {
+        html += '<tr>'
+          + '<td style="font-size:10px">' + a.id + '</td>'
+          + '<td>' + a.appointmentDate + '</td>'
+          + '<td>' + (a.videoSlotStart||'') + '–' + (a.videoSlotEnd||'') + '</td>'
+          + '<td>' + (a.patientName||a.patientId||'-') + '</td>'
+          + '<td><button class="sm green" onclick="doctorJoinCall(&#39;' + a.id + '&#39;)">Join Call</button></td>'
+          + '</tr>';
+      }
+      $('drConfirmedList').innerHTML = html + '</table>';
+    } catch (e) { $('drConfirmedList').innerHTML = '<p style="color:red">' + e.message + '</p>'; }
+  }
 
-    async function endSession() {
-      try {
-        const id = document.getElementById('appointmentId').value;
-        const res = await fetch(baseUrl() + '/sessions/' + id + '/end', { method: 'POST', headers: headers() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        debug('end', await res.json());
-        await leaveChannel();
-      } catch (e) { debug('end error', { message: e.message }); }
-    }
+  function doctorJoinCall(apptId) {
+    currentApptId = apptId;
+    $('vidApptId').value = apptId;
+    $('vidRole').value = 'DOCTOR';
+    setDoctorStep(4);
+    window.scrollTo({ top: $('card-video').offsetTop - 20, behavior: 'smooth' });
+    joinCall();
+  }
+  /* ── utility: my appointments ───────────────────────── */
+  async function loadMyAppointments() {
+    try {
+      const data = await api('GET', '/appointments');
+      if (!data || data.length === 0) { $('myApptList').innerHTML = '<p style="color:var(--muted)">No appointments.</p>'; return; }
+      let html = '<table><tr><th>ID</th><th>Type</th><th>Status</th><th>Date</th><th>Doctor</th><th>Slot</th><th></th></tr>';
+      for (const a of data) {
+        const slot = a.type === 'VIDEO' ? (a.videoSlotStart||'') + '-' + (a.videoSlotEnd||'') : '#' + (a.appointmentNumber||'');
+        const statusClass = a.status === 'CONFIRMED' ? 'badge-ok' : (a.status.includes('PENDING') ? 'badge-warn' : 'badge-err');
+        html += '<tr><td style="font-size:10px">' + a.id + '</td><td>' + a.type + '</td><td><span class="badge '
+          + statusClass + '">' + a.status + '</span></td><td>' + a.appointmentDate + '</td><td>' + (a.doctorName||a.doctorId) + '</td><td>' + slot + '</td>'
+          + '<td>' + (a.status === 'CONFIRMED' && a.type === 'VIDEO' ? '<button class="sm green" onclick="jumpToCall(\''+a.id+'\')">Join</button>' : '') + '</td></tr>';
+      }
+      $('myApptList').innerHTML = html + '</table>';
+      log('loaded ' + data.length + ' appointments');
+    } catch (e) { $('myApptList').innerHTML = '<p style="color:red">' + e.message + '</p>'; }
+  }
 
-    async function leaveChannel() {
-      await clearLocalTracks();
-      if (client && joined) { try { await client.leave(); joined = false; } catch (_) {} }
-      remoteAudioMuted = false; remoteAudioElement = null;
-      playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
-      updatePlaybackStatus();
-    }
+  function jumpToCall(apptId) {
+    currentApptId = apptId;
+    $('vidApptId').value = apptId;
+    $('vidRole').value = userRole;
+    show('card-video');
+    setStep(5);
+    window.scrollTo({ top: $('card-video').offsetTop - 20, behavior: 'smooth' });
+  }
 
-    async function updateDuration() {
-      try {
-        const id = document.getElementById('appointmentId').value;
-        const body = { durationSeconds: parseInt(document.getElementById('newDuration').value, 10), reason: document.getElementById('durationReason').value };
-        const res = await fetch(baseUrl() + '/sessions/' + id + '/duration', { method: 'PATCH', headers: headers(), body: JSON.stringify(body) });
-        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
-        debug('duration updated', await res.json());
-      } catch (e) { debug('duration error', { message: e.message }); }
-    }
-
-    async function loadHistory() {
-      try {
-        const params = new URLSearchParams();
-        const pid = document.getElementById('histPatientId').value.trim();
-        const did = document.getElementById('histDoctorId').value.trim();
-        if (pid) params.set('patientId', pid);
-        if (did) params.set('doctorId', did);
-        const res = await fetch(baseUrl() + '/sessions/history?' + params, { headers: headers() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        debug('history', { count: data.items.length });
-        if (!data.items || data.items.length === 0) { document.getElementById('historyResult').innerHTML = '<p>No sessions found.</p>'; return; }
-        let html = '<table><tr><th>Appointment</th><th>Status</th><th>Patient</th><th>Doctor</th><th>Duration</th><th>Recording</th></tr>';
-        for (const it of data.items) {
-          html += '<tr><td>' + it.appointmentId + '</td><td>' + it.status + '</td><td>' + (it.patientId||'-') + '</td><td>' + (it.doctorId||'-') + '</td><td>' + it.durationSeconds + 's</td><td>' + it.recordingStatus + '</td></tr>';
-        }
-        document.getElementById('historyResult').innerHTML = html + '</table>';
-      } catch (e) { debug('history error', { message: e.message }); }
-    }
-
-    async function sendWebhook() {
-      try {
-        const body = {
-          type: document.getElementById('webhookType').value,
-          appointmentId: document.getElementById('appointmentId').value,
-          userId: document.getElementById('webhookUserId').value,
-          role: document.getElementById('webhookRole').value,
-        };
-        const res = await fetch(baseUrl() + '/sessions/webhooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
-        debug('webhook sent', await res.json());
-      } catch (e) { debug('webhook error', { message: e.message }); }
-    }
-
-    document.getElementById('loginBtn').addEventListener('click', doLogin);
-    document.getElementById('registerBtn').addEventListener('click', doRegister);
-    document.getElementById('joinBtn').addEventListener('click', joinSession);
-    document.getElementById('statusBtn').addEventListener('click', checkStatus);
-    document.getElementById('remainingBtn').addEventListener('click', checkRemaining);
-    document.getElementById('endBtn').addEventListener('click', endSession);
-    document.getElementById('updateDurationBtn').addEventListener('click', updateDuration);
-    document.getElementById('historyBtn').addEventListener('click', loadHistory);
-    document.getElementById('sendWebhookBtn').addEventListener('click', sendWebhook);
-    document.getElementById('muteBtn').addEventListener('click', () => {
-      remoteAudioMuted = !remoteAudioMuted;
-      document.getElementById('muteBtn').textContent = remoteAudioMuted ? 'Unmute' : 'Mute';
-      if (remoteAudioElement) remoteAudioElement.muted = remoteAudioMuted;
-      debug('Remote audio muted: ' + remoteAudioMuted);
-    });
+  /* ── init ─────────────────────────────────────────────── */
+  setStep(1);
   </script>
 </body>
 </html>
