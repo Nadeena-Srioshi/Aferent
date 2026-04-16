@@ -16,15 +16,21 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.RequestEntity;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,12 +42,9 @@ public class PrescriptionService {
     private final PrescriptionRepository prescriptionRepository;
     private final DoctorRepository doctorRepository;
     private final HospitalRepository hospitalRepository;
-    private final MinioService minioService;
-    private final MinioClient minioClient;
     private final DoctorEventProducer eventProducer;
-
-    @Value("${minio.bucket}")
-    private String bucket;
+        private final DocumentServiceGateway documentServiceGateway;
+        private final RestTemplate restTemplate;
 
     @Value("${app.prescription-base-url:http://localhost:8080}")
     private String prescriptionBaseUrl;
@@ -113,6 +116,9 @@ public class PrescriptionService {
         Prescription saved = prescriptionRepository.save(prescription);
         log.info("Prescription issued prescriptionId={} doctorId={} patientId={}",
                 prescriptionId, doctorId, request.getPatientId());
+
+        // publish full prescription event for downstream medical history projection
+        eventProducer.sendPrescriptionIssuedEvent(saved);
 
         // fire notifications
         fireNotifications(saved, prescriptionUrl);
@@ -186,6 +192,49 @@ public class PrescriptionService {
                 .build();
     }
 
+        public String getPrescriptionQrSignedUrl(
+                        String prescriptionId,
+                        String requesterAuthId,
+                        String requesterRole,
+                        String requesterPatientId,
+                        int expiresSeconds
+        ) {
+                Prescription prescription = prescriptionRepository.findByPrescriptionId(prescriptionId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Prescription not found: " + prescriptionId));
+
+                if (prescription.getQrCodeKey() == null || prescription.getQrCodeKey().isBlank()) {
+                        throw new ResourceNotFoundException(
+                                        "No QR document uploaded for prescriptionId=" + prescriptionId);
+                }
+
+                if (expiresSeconds <= 0 || expiresSeconds > 604800) {
+                        throw new IllegalArgumentException("expires must be between 1 and 604800 seconds");
+                }
+
+                if ("DOCTOR".equalsIgnoreCase(requesterRole)) {
+                        Doctor issuer = doctorRepository.findByDoctorId(prescription.getDoctorId())
+                                        .orElseThrow(() -> new ResourceNotFoundException(
+                                                        "Doctor not found: " + prescription.getDoctorId()));
+                        if (!issuer.getAuthId().equals(requesterAuthId)) {
+                                throw new ForbiddenOperationException(
+                                                "Only the issuing doctor can access this prescription QR URL");
+                        }
+                } else if ("PATIENT".equalsIgnoreCase(requesterRole)) {
+                        boolean matchesPatient = prescription.getPatientId().equals(requesterAuthId)
+                                        || (requesterPatientId != null && prescription.getPatientId().equals(requesterPatientId));
+                        if (!matchesPatient) {
+                                throw new ForbiddenOperationException(
+                                                "Only the receiving patient can access this prescription QR URL");
+                        }
+                } else {
+                        throw new ForbiddenOperationException(
+                                        "Only the issuing doctor or receiving patient can access this prescription QR URL");
+                }
+
+                return documentServiceGateway.generateDownloadUrl(prescription.getQrCodeKey(), expiresSeconds);
+        }
+
     // ─── QR generation ──────────────────────────────────────────────
 
     private String generateAndUploadQr(String prescriptionId, String url) {
@@ -196,25 +245,55 @@ public class PrescriptionService {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             MatrixToImageWriter.writeToStream(matrix, "PNG", out);
             byte[] qrBytes = out.toByteArray();
+            log.info("Generated QR PNG for prescriptionId={} with {} bytes", prescriptionId, qrBytes.length);
 
-            String objectKey = "prescriptions/qr/" + prescriptionId + ".png";
+            String category = "prescription-qr/" + prescriptionId;
+            String fileName = prescriptionId + ".png";
 
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(bucket)
-                            .object(objectKey)
-                            .stream(new ByteArrayInputStream(qrBytes),
-                                    qrBytes.length, -1)
-                            .contentType("image/png")
-                            .build()
+            // Get presigned upload URL from document-service
+            DocumentServiceGateway.PresignUploadResult presignResult = documentServiceGateway.generateUploadUrl(
+                    "private",
+                    category,
+                    fileName,
+                    false
             );
 
-            log.info("QR uploaded to MinIO key={}", objectKey);
+            String uploadTarget = (presignResult.internalUploadUrl() != null && !presignResult.internalUploadUrl().isBlank())
+                    ? presignResult.internalUploadUrl()
+                    : presignResult.uploadUrl();
+
+                        // Upload QR bytes directly via presigned URL.
+                        // Use URI-based request to preserve query params exactly as signed.
+                        URI uploadUri = URI.create(uploadTarget);
+                        RequestEntity<byte[]> uploadRequest = RequestEntity
+                                        .put(uploadUri)
+                                        .body(qrBytes);
+
+                        try {
+                                restTemplate.exchange(uploadRequest, Void.class);
+                        } catch (Exception uploadEx) {
+                                // Diagnostic aid: prove QR bytes were generated by writing a local temp file.
+                                try {
+                                        Path debugPath = Path.of(System.getProperty("java.io.tmpdir"), prescriptionId + ".png");
+                                        Files.write(debugPath, qrBytes);
+                                        log.error("QR upload failed for prescriptionId={}. Saved local QR at {}", prescriptionId, debugPath, uploadEx);
+                                } catch (Exception ioEx) {
+                                        log.error("QR upload failed for prescriptionId={} and failed to save local debug QR", prescriptionId, ioEx);
+                                }
+                                throw uploadEx;
+                        }
+
+            String objectKey = presignResult.objectKey();
+            if (objectKey == null || objectKey.isBlank()) {
+                throw new RuntimeException("Failed to get object key from document-service presign response");
+            }
+
+            log.info("QR uploaded to MinIO via document-service, prescriptionId={}, key={}", prescriptionId, objectKey);
             return objectKey;
 
         } catch (Exception e) {
             log.error("Failed to generate/upload QR for prescriptionId={}", prescriptionId, e);
-            throw new RuntimeException("Failed to generate QR code");
+            throw new RuntimeException("Failed to generate QR code", e);
         }
     }
 
@@ -222,7 +301,8 @@ public class PrescriptionService {
 
     private void fireNotifications(Prescription p, String prescriptionUrl) {
 
-        String qrDownloadUrl = minioService.generateDownloadUrl(p.getQrCodeKey());
+        // Get signed download URL for private QR file
+        String qrDownloadUrl = documentServiceGateway.generateDownloadUrl(p.getQrCodeKey(), 3600);
         String doctorDisplay = "Dr. " + p.getDoctorName();
         String hospitalDisplay = p.getHospitalName() != null
                 ? p.getHospitalName() : "Video Consultation";

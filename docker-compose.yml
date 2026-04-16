@@ -153,6 +153,7 @@ services:
       AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE}
       AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET}
       AGORA_TOKEN_TTL_SEC: ${AGORA_TOKEN_TTL_SEC}
+      
   minio-event-init:
     image: minio/mc:latest
     container_name: minio-event-init
@@ -192,11 +193,11 @@ services:
     ports:
       - "3009:3009"
     environment:
-      MINIO_ENDPOINT: nginx:9000
-      MINIO_PUBLIC_HOST: http://localhost:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: app-storage
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: "false"
       SERVER_PORT: "3009"
     depends_on:
@@ -233,8 +234,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      document-service:
+        condition: service_started
     environment:
       MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -244,6 +245,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
       PRESCRIPTION_BASE_URL: http://localhost:8080
+      DOCUMENT_SERVICE_URL: http://document-service:3009
+      DOCUMENT_SERVICE_ID: doctor-service
     volumes:
       - ./logs/doctor-service:/app/logs
     healthcheck:
@@ -314,6 +317,27 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+  symptom-detector:
+    build:
+      context: ./services/symptom-detector
+      dockerfile: Dockerfile
+    container_name: symptom-detector
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: ${MONGO_URI_SYMPTOM_SERVICE}
+    volumes:
+      - ./services/symptom-detector/app:/app/app   # hot-reload in dev; remove in prod
+    networks: [aferent-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/ai/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   aferent-network:

@@ -36,7 +36,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/payments/webhook",
             "/actuator",
             "/doctors/register/profile",
-            "/doctors/register/license-upload-url",
+            "/doctors/license-upload-url",
             "/doctors/register/license-confirm",
             "/hospitals",
             "/specializations",

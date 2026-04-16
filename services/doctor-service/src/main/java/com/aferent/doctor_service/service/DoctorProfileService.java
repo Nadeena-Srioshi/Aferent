@@ -6,11 +6,14 @@ import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import com.aferent.doctor_service.repository.HospitalRepository;
+import com.aferent.doctor_service.service.DocumentServiceGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +22,7 @@ public class DoctorProfileService {
 
     private final DoctorRepository doctorRepository;
     private final HospitalRepository hospitalRepository;
-    private final MinioService minioService;
+    private final DocumentServiceGateway documentServiceGateway;
 
     public List<Doctor> getAllActiveDoctors() {
         return doctorRepository.findByStatus(Doctor.RegistrationStatus.ACTIVE);
@@ -73,38 +76,91 @@ public class DoctorProfileService {
         return saved;
     }
 
-    public String getProfilePicUploadUrl(String doctorId, String authId,
-                                          String fileName, String contentType) {
-        validateOwnershipAndActive(doctorId, authId);
+    public Map<String, String> getProfilePicUploadUrl(String authId, String fileName) {
+        Doctor doctor = doctorRepository.findByAuthId(authId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found for authId=" + authId));
 
-        if (!contentType.startsWith("image/")) {
+        if (doctor.getStatus() != Doctor.RegistrationStatus.ACTIVE) {
+            throw new ForbiddenOperationException(
+                    "Account not active. Current status: " + doctor.getStatus());
+        }
+
+        if (!isImageFile(fileName)) {
             throw new IllegalArgumentException(
                     "Only image files are allowed for profile picture");
         }
 
-        String objectKey = "profile-pics/" + doctorId + "/" + fileName;
-        return minioService.generateUploadUrl(objectKey, contentType);
+        String category = "profile-picture/" + doctor.getDoctorId();
+
+        // Get presigned URL from document-service
+        DocumentServiceGateway.PresignUploadResult result = documentServiceGateway.generateUploadUrl(
+                "public",
+                category,
+                fileName,
+                true  // append UUID to avoid collisions
+        );
+
+        // Store the permanent URL immediately (for public files, this URL is stable)
+        if (result.permanentUrl() != null && !result.permanentUrl().isBlank()) {
+            doctor.setProfilePicUrl(result.permanentUrl());
+            doctorRepository.save(doctor);
+            log.info("Profile picture URL stored proactively for doctorId={}", doctor.getDoctorId());
+        }
+
+        Map<String, String> response = new HashMap<>();
+        response.put("uploadUrl", result.uploadUrl());
+        if (result.permanentUrl() != null) {
+            response.put("permanentUrl", result.permanentUrl());
+        }
+        return response;
     }
 
-    public Doctor confirmProfilePicUpload(String doctorId, String authId, String objectKey) {
-        Doctor doctor = validateOwnershipAndActive(doctorId, authId);
-        doctor.setProfilePicKey(objectKey);
-        Doctor saved = doctorRepository.save(doctor);
-        log.info("Profile picture updated for doctorId={}", doctorId);
-        return saved;
-    }
-
-    public String getProfilePicDownloadUrl(String doctorId) {
+    public String getProfilePicUrl(String doctorId) {
         Doctor doctor = doctorRepository.findByDoctorId(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Doctor not found: " + doctorId));
 
-        if (doctor.getProfilePicKey() == null || doctor.getProfilePicKey().isBlank()) {
+        if (doctor.getProfilePicUrl() == null || doctor.getProfilePicUrl().isBlank()) {
             throw new ResourceNotFoundException(
                     "No profile picture uploaded for doctorId=" + doctorId);
         }
 
-        return minioService.generateDownloadUrl(doctor.getProfilePicKey());
+        return doctor.getProfilePicUrl();
+    }
+
+    public String getLicenseSignedUrl(String doctorId, String requesterAuthId, String requesterRole, int expiresSeconds) {
+        Doctor doctor = doctorRepository.findByDoctorId(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found: " + doctorId));
+
+        if (!"ADMIN".equalsIgnoreCase(requesterRole)) {
+            if (!"DOCTOR".equalsIgnoreCase(requesterRole)) {
+                throw new ForbiddenOperationException("Only the doctor owner or an admin can access license documents");
+            }
+            if (!doctor.getAuthId().equals(requesterAuthId)) {
+                throw new ForbiddenOperationException("You can only access your own license document");
+            }
+        }
+
+        if (doctor.getLicenseDocKey() == null || doctor.getLicenseDocKey().isBlank()) {
+            throw new ResourceNotFoundException(
+                    "No license document uploaded for doctorId=" + doctorId);
+        }
+
+        if (expiresSeconds <= 0 || expiresSeconds > 604800) {
+            throw new IllegalArgumentException("expires must be between 1 and 604800 seconds");
+        }
+
+        return documentServiceGateway.generateDownloadUrl(doctor.getLicenseDocKey(), expiresSeconds);
+    }
+
+    private boolean isImageFile(String fileName) {
+        if (fileName == null) return false;
+        String lowerCase = fileName.toLowerCase();
+        return lowerCase.endsWith(".jpg") || lowerCase.endsWith(".jpeg") 
+                || lowerCase.endsWith(".png") || lowerCase.endsWith(".gif") 
+                || lowerCase.endsWith(".webp");
     }
 
     private Doctor validateOwnershipAndActive(String doctorId, String authId) {

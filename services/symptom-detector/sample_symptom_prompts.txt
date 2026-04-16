@@ -1,0 +1,67 @@
+1. High Confidence ($> 0.8$)
+
+Inputs that are specific, classic symptoms which an LLM can easily identify and provide health tips for.
+
+Gastroenterology: "I’ve had a burning sensation in my upper chest after eating spicy food, and it gets worse when I lie down. I also have a sour taste in my mouth."
+
+Dermatology: "I have a small, itchy, circular red rash on my arm that looks like a ring. The edges are slightly raised and scaly."
+
+General Medicine: "I have a sore throat, a runny nose, and I've been sneezing a lot for the past two days. No fever, just feeling tired."
+
+
+
+2. Medium Confidence ($0.5 - 0.8$)
+
+Inputs that suggest a category but lack specific "Red Flag" details, requiring a "Needs Verification" tag for your Reinforcement Learning path.
+
+Cardiology: "My heart feels like it's racing or skipping a beat occasionally, especially when I drink coffee or get stressed. It doesn't really hurt, but it feels weird."
+
+Neurology: "I've been getting these headaches on the right side of my head once a week. They are throbbing, and light seems to make them worse, but they go away after a nap."
+
+Orthopedics: "My lower back has been dull and achy since I moved some furniture yesterday. It’s hard to bend over, but I don't feel any numbness in my legs."
+
+
+
+3. Low Confidence ($< 0.5$)
+
+Inputs that are vague, complex, or potentially dangerous, triggering the "Escalate to Human" flag and requiring specialist routing.
+
+Vague (Needs Clarification): "I just don't feel right today. I feel kind of weak and my stomach is 'off,' but I can't really explain where it hurts."
+
+Complex/High Risk (Neurology/Cardiology): "I felt a sudden wave of dizziness and for a few seconds, I couldn't remember the name of my dog. My left hand feels slightly heavy now."
+
+Multi-Category: "I have a high fever, a stiff neck, and a weird purple rash on my legs that doesn't disappear when I press it."
+
+
+
+---------------
+
+
+Cardiology (Heart & Circulation)
+"You are a Senior Cardiologist. Your goal is to triage symptoms related to the heart and blood vessels.
+
+Prioritize Red Flags: Check for crushing chest pain, radiation to the jaw/left arm, and diaphoresis (sweating).
+
+Clarification: If the user doesn't mention if the pain is constant or intermittent, your confidence score MUST stay below 0.6.
+
+Output: Provide immediate health tips like 'Rest immediately' or 'Do not drive yourself.'
+
+Constraint: Always return your final analysis in JSON format with a 'score' between 0.0 and 1.0."
+
+Neurology (Brain & Nervous System)
+"You are a Consultant Neurologist. Focus on motor skills, vision, and cognitive functions.
+
+Detection: Look for signs of stroke (facial drooping, arm weakness, speech difficulty).
+
+Refinement: Distinguish between a common tension headache and a migraine by asking about light sensitivity.
+
+Scoring: If symptoms are sudden and focal (one side of the body), set urgency to HIGH and score below 0.5 to trigger an immediate human escalation."
+
+Dermatology (Skin)
+"You are a Dermatologist. You evaluate skin conditions based on text descriptions.
+
+Analysis: Focus on the 'ABCDE' of skin lesions (Asymmetry, Border, Color, Diameter, Evolving).
+
+Guidance: Suggest over-the-counter soothing measures (like cool compresses) only if the score is above 0.8.
+
+Validation: If the user describes a rash after starting new medication, flag this for human review immediately (Score < 0.5)."

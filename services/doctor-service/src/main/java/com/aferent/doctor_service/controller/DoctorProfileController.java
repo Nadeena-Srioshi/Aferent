@@ -40,39 +40,38 @@ public class DoctorProfileController {
         return ResponseEntity.ok(profileService.updateProfile(doctorId, authId, request));
     }
 
-    // step 1 — get presigned URL to upload profile picture
-    @PostMapping("/{doctorId}/profile/pic-upload-url")
+    // Get presigned URL to upload profile picture
+    // Backend stores the permanent URL immediately upon presign request
+    // Frontend uploads directly to MinIO using the uploadUrl
+    // Identity comes from X-User-ID because the caller is already authenticated
+    @PostMapping("/profile/pic-upload-url")
     public ResponseEntity<Map<String, String>> getProfilePicUploadUrl(
-            @PathVariable String doctorId,
             @RequestHeader("X-User-ID") String authId,
-            @RequestParam String fileName,
-            @RequestParam String contentType
+            @RequestParam String fileName
     ) {
-        String url = profileService.getProfilePicUploadUrl(doctorId, authId, fileName, contentType);
-        String objectKey = "profile-pics/" + doctorId + "/" + fileName;
-        return ResponseEntity.ok(Map.of(
-                "uploadUrl", url,
-                "objectKey", objectKey
-        ));
+        return ResponseEntity.ok(profileService.getProfilePicUploadUrl(authId, fileName));
     }
 
-    // step 2 — confirm profile picture upload
-    @PostMapping("/{doctorId}/profile/pic-confirm")
-    public ResponseEntity<Doctor> confirmProfilePicUpload(
-            @PathVariable String doctorId,
-            @RequestHeader("X-User-ID") String authId,
-            @RequestParam String objectKey
-    ) {
-        return ResponseEntity.ok(
-                profileService.confirmProfilePicUpload(doctorId, authId, objectKey));
-    }
-
-    // get profile picture download URL
+    // Get profile picture permanent URL (for public profile picture)
+    // Returns the public URL stored when the picture was uploaded
     @GetMapping("/{doctorId}/profile/pic-url")
     public ResponseEntity<Map<String, String>> getProfilePicUrl(
             @PathVariable String doctorId
     ) {
-        String url = profileService.getProfilePicDownloadUrl(doctorId);
-        return ResponseEntity.ok(Map.of("downloadUrl", url));
+        String url = profileService.getProfilePicUrl(doctorId);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
+
+    // Get signed URL for private license document
+    // Accessible to the doctor owner and admins only
+    @GetMapping("/{doctorId}/license/signed-url")
+    public ResponseEntity<Map<String, String>> getLicenseSignedUrl(
+            @PathVariable String doctorId,
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role,
+            @RequestParam(defaultValue = "3600") int expires
+    ) {
+        String url = profileService.getLicenseSignedUrl(doctorId, authId, role, expires);
+        return ResponseEntity.ok(Map.of("url", url));
     }
 }

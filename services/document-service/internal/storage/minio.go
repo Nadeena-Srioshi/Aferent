@@ -112,12 +112,23 @@ func BuildObjectKey(serviceID, visibility, category, filename string, appendUUID
 // PresignPut returns a presigned HTTP PUT URL the client can use to upload
 // directly to MinIO. The URL expires in 15 minutes.
 func (c *Client) PresignPut(ctx context.Context, objectKey string) (string, error) {
+	raw, err := c.PresignPutInternal(ctx, objectKey)
+	if err != nil {
+		return "", err
+	}
+
+	return c.toPublicURL(raw), nil
+}
+
+// PresignPutInternal returns the raw presigned HTTP PUT URL using MINIO_ENDPOINT
+// host/scheme without rewriting to MINIO_PUBLIC_HOST.
+func (c *Client) PresignPutInternal(ctx context.Context, objectKey string) (string, error) {
 	u, err := c.mc.PresignedPutObject(ctx, c.cfg.MinioBucket, objectKey, 15*time.Minute)
 	if err != nil {
 		return "", fmt.Errorf("generating presigned PUT URL: %w", err)
 	}
 
-	return c.toPublicURL(u.String()), nil
+	return u.String(), nil
 }
 
 // toPublicURL rewrites the generated URL host/scheme to MINIO_PUBLIC_HOST
