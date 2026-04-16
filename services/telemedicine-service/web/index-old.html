@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telemedicine Test Console</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background: #f5f7fb; color: #111; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 980px; }
+    .card { background: #fff; border: 1px solid #dce2ef; border-radius: 12px; padding: 12px; }
+    label { display: block; margin: 6px 0 2px; font-weight: 600; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #b8c2d8; font-size: 14px; }
+    button { cursor: pointer; background: #1254ff; color: #fff; border: none; }
+    button.secondary { background: #253042; }
+    button.danger { background: #dc2626; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+    .video-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #0f172a; color: #cbd5e1; padding: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+    #local-video, #remote-video { width: 100%; height: 300px; background: #111827; border-radius: 10px; overflow: hidden; }
+    #local-video video, #remote-video video { width: 100%; height: 100%; object-fit: contain; }
+    .video-label { font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .status-badge { display: inline-block; padding: 4px 8px; background: #e8f5e9; color: #1b5e20; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th, td { padding: 6px 8px; border: 1px solid #dce2ef; text-align: left; }
+    th { background: #f0f4f8; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+    .tabs button { background: #e2e8f0; color: #334155; }
+    .tabs button.active { background: #1254ff; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Telemedicine Test Console</h1>
+  <p>Use this page to test the telemedicine video call API. Open on laptop and phone with the same appointment ID for a two-person call.</p>
+
+  <div class="grid">
+    <!-- Session Controls -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Appointment ID</label>
+          <input id="appointmentId" value="appt-001" />
+        </div>
+        <div>
+          <label>User ID</label>
+          <input id="userId" value="doctor-001" />
+        </div>
+        <div>
+          <label>Role</label>
+          <select id="role">
+            <option>DOCTOR</option>
+            <option>PATIENT</option>
+          </select>
+        </div>
+        <div>
+          <label>Email</label>
+          <input id="email" value="doctor@example.com" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="joinBtn">Join Session</button>
+        <button id="statusBtn" class="secondary">Check Status</button>
+        <button id="remainingBtn" class="secondary">Remaining Time</button>
+        <button id="endBtn" class="danger">End Session</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label><input id="publishAudio" type="checkbox" checked /> Publish Audio</label>
+        <label><input id="publishVideo" type="checkbox" checked /> Publish Video</label>
+      </div>
+      <p id="statusText"></p>
+    </div>
+
+    <!-- Duration Controls -->
+    <div class="card">
+      <h3>Duration Controls (Doctor/Admin only)</h3>
+      <div class="row">
+        <div>
+          <label>New Duration (seconds)</label>
+          <input id="newDuration" type="number" value="3600" min="60" />
+        </div>
+        <div>
+          <label>Reason</label>
+          <input id="durationReason" value="need more time" />
+        </div>
+        <button id="updateDurationBtn" class="secondary" style="align-self:flex-end;">Update Duration</button>
+      </div>
+    </div>
+
+    <!-- Video Preview -->
+    <div class="card">
+      <h3>Video Preview</h3>
+      <div class="video-row">
+        <div>
+          <div class="video-label">Local <span class="status-badge" id="localAudioStatus"></span></div>
+          <div id="local-video"></div>
+        </div>
+        <div>
+          <div class="video-label">Remote <span class="status-badge" id="remoteAudioStatus"></span> <button id="muteBtn" style="padding: 4px 8px; font-size: 12px; margin-left: auto;">Mute</button></div>
+          <div id="remote-video"></div>
+        </div>
+      </div>
+      <p style="margin-top:8px; font-size: 12px; color: #666;">If token starts with "dev-", Agora credentials are not configured. API still works but video will not connect.</p>
+    </div>
+
+    <!-- Tabs: History / Webhook Test -->
+    <div class="card">
+      <div class="tabs">
+        <button class="active" onclick="switchTab(this, 'history')">Session History</button>
+        <button onclick="switchTab(this, 'webhook')">Webhook Test</button>
+      </div>
+
+      <div id="tab-history" class="tab-content active">
+        <div class="row">
+          <div>
+            <label>Patient ID (optional)</label>
+            <input id="histPatientId" value="" placeholder="leave empty for all" />
+          </div>
+          <div>
+            <label>Doctor ID (optional)</label>
+            <input id="histDoctorId" value="" placeholder="leave empty for all" />
+          </div>
+          <button id="historyBtn" class="secondary" style="align-self:flex-end;">Load History</button>
+        </div>
+        <div id="historyResult"></div>
+      </div>
+
+      <div id="tab-webhook" class="tab-content">
+        <p style="font-size:13px; color:#555;">Simulate an Agora webhook event. No signature check needed if AGORA_WEBHOOK_SECRET is empty.</p>
+        <div class="row">
+          <div>
+            <label>Event Type</label>
+            <select id="webhookType">
+              <option value="participant_joined">participant_joined</option>
+              <option value="participant_left">participant_left</option>
+              <option value="recording_ready">recording_ready</option>
+            </select>
+          </div>
+          <div>
+            <label>User ID</label>
+            <input id="webhookUserId" value="doctor-001" />
+          </div>
+          <div>
+            <label>Role</label>
+            <input id="webhookRole" value="DOCTOR" />
+          </div>
+          <button id="sendWebhookBtn" class="secondary" style="align-self:flex-end;">Send Webhook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug Log -->
+    <div class="card">
+      <h3>Debug Log</h3>
+      <button onclick="document.getElementById('debug').textContent=''" class="secondary" style="font-size:12px;margin-bottom:6px;">Clear</button>
+      <div id="debug" class="mono"></div>
+    </div>
+  </div>
+
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+  <script>
+    const debug = (msg, obj) => {
+      const el = document.getElementById('debug');
+      const line = '[' + new Date().toISOString() + '] ' + msg + (obj ? '\n' + JSON.stringify(obj, null, 2) : '');
+      el.textContent = line + '\n\n' + el.textContent;
+      console.log(msg, obj || '');
+    };
+
+    function switchTab(btn, name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    const headers = () => ({
+      'Content-Type': 'application/json',
+      'X-User-ID': document.getElementById('userId').value,
+      'X-User-Role': document.getElementById('role').value,
+      'X-User-Email': document.getElementById('email').value,
+    });
+
+    let client = null, localTracks = [], joined = false, remoteAudioMuted = false, remoteAudioElement = null;
+    let playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
+
+    function updatePlaybackStatus() {
+      document.getElementById('localAudioStatus').textContent = playbackStatus.localAudio ? 'Audio ON' : '';
+      document.getElementById('remoteAudioStatus').textContent = playbackStatus.remoteAudio ? 'Audio ON' : '';
+    }
+
+    async function clearLocalTracks() {
+      for (const t of localTracks) { try { t.stop(); } catch (_) {} try { t.close(); } catch (_) {} }
+      localTracks = [];
+    }
+
+    async function joinSession() {
+      const id = document.getElementById('appointmentId').value;
+      try {
+        const res = await fetch('/sessions/join/' + id, { method: 'POST', headers: headers() });
+        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
+        const data = await res.json();
+        debug('join response', data);
+        document.getElementById('statusText').textContent = 'Session: ' + data.status + ', otherJoined=' + data.otherParticipantJoined;
+        if (!data.appId || !data.token || data.token.startsWith('dev-')) { debug('Dev token — video will not connect'); return; }
+        if (!client) {
+          client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+          client.on('user-published', async (user, mediaType) => {
+            try {
+              await client.subscribe(user, mediaType);
+              debug('subscribed', { uid: user.uid, mediaType });
+              if (mediaType === 'video' && user.videoTrack) { user.videoTrack.play('remote-video'); playbackStatus.remoteVideo = true; }
+              if (mediaType === 'audio' && user.audioTrack) { remoteAudioElement = user.audioTrack; user.audioTrack.play(); playbackStatus.remoteAudio = true; }
+              updatePlaybackStatus();
+            } catch (e) { debug('subscribe error', { message: e.message }); }
+          });
+          client.on('user-unpublished', (user, mediaType) => {
+            if (mediaType === 'audio') { remoteAudioElement = null; playbackStatus.remoteAudio = false; }
+            if (mediaType === 'video') { playbackStatus.remoteVideo = false; }
+            updatePlaybackStatus();
+          });
+          client.on('user-left', () => {
+            remoteAudioElement = null; playbackStatus.remoteAudio = false; playbackStatus.remoteVideo = false; updatePlaybackStatus();
+          });
+        }
+        await client.join(data.appId, data.channelName, data.token, data.uid);
+        joined = true;
+        const pubA = document.getElementById('publishAudio').checked, pubV = document.getElementById('publishVideo').checked;
+        if (pubA || pubV) {
+          try {
+            localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+            if (pubV && localTracks.length > 1) { localTracks[1].play('local-video'); playbackStatus.localVideo = true; }
+            if (pubA) { playbackStatus.localAudio = true; }
+            updatePlaybackStatus();
+            await client.publish(localTracks);
+            debug('published tracks');
+          } catch (e) { debug('track error', { message: e.message }); }
+        }
+      } catch (e) { debug('join error', { message: e.message }); }
+    }
+
+    async function checkStatus() {
+      try {
+        const id = document.getElementById('appointmentId').value;
+        const res = await fetch('/sessions/' + id + '/status', { headers: headers() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        debug('status', data);
+        document.getElementById('statusText').textContent = 'doctor=' + data.doctorJoined + ' patient=' + data.patientJoined + ' remaining=' + data.remainingDurationSec + 's status=' + data.status;
+      } catch (e) { debug('status error', { message: e.message }); }
+    }
+
+    async function checkRemaining() {
+      try {
+        const id = document.getElementById('appointmentId').value;
+        const res = await fetch('/sessions/' + id + '/remaining-duration', { headers: headers() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        debug('remaining', await res.json());
+      } catch (e) { debug('remaining error', { message: e.message }); }
+    }
+
+    async function endSession() {
+      try {
+        const id = document.getElementById('appointmentId').value;
+        const res = await fetch('/sessions/' + id + '/end', { method: 'POST', headers: headers() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        debug('end', await res.json());
+        await leaveChannel();
+      } catch (e) { debug('end error', { message: e.message }); }
+    }
+
+    async function leaveChannel() {
+      await clearLocalTracks();
+      if (client && joined) { try { await client.leave(); joined = false; } catch (_) {} }
+      remoteAudioMuted = false; remoteAudioElement = null;
+      playbackStatus = { localAudio: false, localVideo: false, remoteAudio: false, remoteVideo: false };
+      updatePlaybackStatus();
+    }
+
+    async function updateDuration() {
+      try {
+        const id = document.getElementById('appointmentId').value;
+        const body = { durationSeconds: parseInt(document.getElementById('newDuration').value, 10), reason: document.getElementById('durationReason').value };
+        const res = await fetch('/sessions/' + id + '/duration', { method: 'PATCH', headers: headers(), body: JSON.stringify(body) });
+        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
+        debug('duration updated', await res.json());
+      } catch (e) { debug('duration error', { message: e.message }); }
+    }
+
+    async function loadHistory() {
+      try {
+        const params = new URLSearchParams();
+        const pid = document.getElementById('histPatientId').value.trim();
+        const did = document.getElementById('histDoctorId').value.trim();
+        if (pid) params.set('patientId', pid);
+        if (did) params.set('doctorId', did);
+        const res = await fetch('/sessions/history?' + params, { headers: headers() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        debug('history', { count: data.items.length });
+        if (!data.items || data.items.length === 0) { document.getElementById('historyResult').innerHTML = '<p>No sessions found.</p>'; return; }
+        let html = '<table><tr><th>Appointment</th><th>Status</th><th>Patient</th><th>Doctor</th><th>Duration</th><th>Recording</th></tr>';
+        for (const it of data.items) {
+          html += '<tr><td>' + it.appointmentId + '</td><td>' + it.status + '</td><td>' + (it.patientId||'-') + '</td><td>' + (it.doctorId||'-') + '</td><td>' + it.durationSeconds + 's</td><td>' + it.recordingStatus + '</td></tr>';
+        }
+        document.getElementById('historyResult').innerHTML = html + '</table>';
+      } catch (e) { debug('history error', { message: e.message }); }
+    }
+
+    async function sendWebhook() {
+      try {
+        const body = {
+          type: document.getElementById('webhookType').value,
+          appointmentId: document.getElementById('appointmentId').value,
+          userId: document.getElementById('webhookUserId').value,
+          role: document.getElementById('webhookRole').value,
+        };
+        const res = await fetch('/sessions/webhooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!res.ok) { const t = await res.text(); throw new Error('HTTP ' + res.status + ': ' + t); }
+        debug('webhook sent', await res.json());
+      } catch (e) { debug('webhook error', { message: e.message }); }
+    }
+
+    document.getElementById('joinBtn').addEventListener('click', joinSession);
+    document.getElementById('statusBtn').addEventListener('click', checkStatus);
+    document.getElementById('remainingBtn').addEventListener('click', checkRemaining);
+    document.getElementById('endBtn').addEventListener('click', endSession);
+    document.getElementById('updateDurationBtn').addEventListener('click', updateDuration);
+    document.getElementById('historyBtn').addEventListener('click', loadHistory);
+    document.getElementById('sendWebhookBtn').addEventListener('click', sendWebhook);
+    document.getElementById('muteBtn').addEventListener('click', () => {
+      remoteAudioMuted = !remoteAudioMuted;
+      document.getElementById('muteBtn').textContent = remoteAudioMuted ? 'Unmute' : 'Mute';
+      if (remoteAudioElement) remoteAudioElement.muted = remoteAudioMuted;
+      debug('Remote audio muted: ' + remoteAudioMuted);
+    });
+  </script>
+</body>
+</html>

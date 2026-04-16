@@ -95,6 +95,7 @@ app:
     - /hospitals/**
     - /specializations/**
     - /doctors/**
+    - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
 
 logging:
   pattern:
