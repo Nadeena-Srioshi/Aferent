@@ -41,7 +41,12 @@ spring:
         - id: doctor-service
           uri: http://doctor-service:3003
           predicates:
-            - Path=/doctors/**
+            - Path=/doctors/**, /admin/doctors/**,/admin/hospitals/**, /admin/specializations/**, /hospitals/**, /specializations/**
+
+        - id: prescriptions-public
+          uri: http://doctor-service:3003
+          predicates:
+            - Path=/prescriptions/**
 
         # APPOINTMENT SERVICE
         - id: appointment-service
@@ -84,6 +89,13 @@ app:
     - /auth/refresh
     - /actuator/**
     - /payments/webhook   # payment provider calls this — no JWT, uses HMAC instead
+    - /doctors/register/profile
+    - /doctors/register/license-upload-url
+    - /doctors/register/license-confirm
+    - /hospitals/**
+    - /specializations/**
+    - /doctors/**
+    - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
 
 logging:
   pattern:

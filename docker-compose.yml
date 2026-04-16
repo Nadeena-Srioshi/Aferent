@@ -83,6 +83,24 @@ services:
     volumes:
       - ./logs/api-gateway:/app/logs
 
+  postgres-telemedicine:
+    image: postgres:16-alpine
+    container_name: postgres-telemedicine
+    networks: [aferent-network]
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: telemedicine_db
+      POSTGRES_USER: telemedicine
+      POSTGRES_PASSWORD: telemedicine
+    volumes:
+      - telemedicine-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemedicine -d telemedicine_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -106,6 +124,35 @@ services:
       timeout: 5s
       retries: 5
 
+  telemedicine-service:
+    build:
+      context: ./services/telemedicine-service
+    container_name: telemedicine-service
+    networks: [aferent-network]
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres-telemedicine:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      PORT: 3006
+      TELEMEDICINE_DB_DSN: postgres://telemedicine:telemedicine@postgres-telemedicine:5432/telemedicine_db?sslmode=disable
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_SESSION_EVENTS: telemedicine.events
+      KAFKA_TOPIC_SESSION_STARTED: telemedicine.session.started
+      APPOINTMENT_MODE: remote
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3004
+      SESSION_LINK_BASE_URL: http://localhost:8080
+      DEFAULT_SESSION_DURATION_SEC: 1800
+      WARNING_THRESHOLD_SEC: 300
+      NO_SHOW_THRESHOLD_SEC: 60
+      RECONNECT_GRACE_SEC: 90
+      AGORA_APP_ID: ${AGORA_APP_ID}
+      AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE}
+      AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET}
+      AGORA_TOKEN_TTL_SEC: ${AGORA_TOKEN_TTL_SEC}
   minio-event-init:
     image: minio/mc:latest
     container_name: minio-event-init
@@ -176,6 +223,35 @@ services:
       DOCUMENT_SERVICE_URL: http://document-service:3009
       DOCUMENT_SERVICE_ID: patient-service
 
+  doctor-service:
+    build:
+      context: ./services/doctor-service
+    container_name: doctor-service
+    networks: [aferent-network]
+    ports:
+      - "3003:3003"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
+      PRESCRIPTION_BASE_URL: http://localhost:8080
+    volumes:
+      - ./logs/doctor-service:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   notification-service:
     build:
       context: ./services/notification-service
@@ -205,6 +281,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+  
   appointment-service:
     build:
       context: ./services/appointment-service
@@ -245,4 +322,5 @@ networks:
 volumes:
   mongo-data:
   kafka-data:
+  telemedicine-postgres-data:
   minio-data:
