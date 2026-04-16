@@ -76,8 +76,21 @@ public class DoctorRegistrationService {
         Doctor doctor = doctorRepository.findByAuthId(authId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Doctor not found for authId=" + authId));
+
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new IllegalArgumentException("objectKey cannot be empty");
+        }
+
         doctor.setLicenseDocKey(objectKey);
-        return doctorRepository.save(doctor);
+        Doctor saved = doctorRepository.save(doctor);
+        log.info("License key saved for authId={}, doctorId={}", authId, doctor.getDoctorId());
+        return saved;
+    }
+
+    public Doctor getDoctorByAuthId(String authId) {
+        return doctorRepository.findByAuthId(authId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found for authId=" + authId));
     }
 
     private String generateDoctorId() {

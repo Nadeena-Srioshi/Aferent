@@ -1,9 +1,10 @@
 package com.aferent.doctor_service.controller;
 
 import com.aferent.doctor_service.dto.RegisterProfileRequest;
+import com.aferent.doctor_service.dto.LicenseUploadUrlRequest;
 import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.service.DoctorRegistrationService;
-import com.aferent.doctor_service.service.MinioService;
+import com.aferent.doctor_service.service.DocumentServiceGateway;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ import java.util.Map;
 public class DoctorRegistrationController {
 
     private final DoctorRegistrationService registrationService;
-    private final MinioService minioService;
+    private final DocumentServiceGateway documentServiceGateway;
 
     // Step 2+3 of multi-step form — called right after POST /auth/register
     // No JWT required — whitelisted at gateway like /auth/register
@@ -28,28 +29,25 @@ public class DoctorRegistrationController {
         return ResponseEntity.ok(registrationService.completeProfile(request));
     }
 
-    // Get presigned URL to upload license document to MinIO
-    // No JWT required — doctor hasn't been verified yet
-    @PostMapping("/register/license-upload-url")
+        // Get presigned URL to upload license document to document-service
+        // Public endpoint: authId is passed in request body
+    @PostMapping("/license-upload-url")
     public ResponseEntity<Map<String, String>> getLicenseUploadUrl(
-            @RequestParam String authId,
-            @RequestParam String fileName,
-            @RequestParam String contentType
+                        @Valid @RequestBody LicenseUploadUrlRequest request
     ) {
-        String objectKey = "licenses/" + authId + "/" + fileName;
-        String url = minioService.generateUploadUrl(objectKey, contentType);
-        return ResponseEntity.ok(Map.of(
-                "uploadUrl", url,
-                "objectKey", objectKey
-        ));
-    }
+                Doctor doctor = registrationService.getDoctorByAuthId(request.getAuthId());
+        String category = "doctor-license/" + doctor.getDoctorId();
 
-    // Save license object key after frontend finishes uploading to MinIO
-    @PostMapping("/register/license-confirm")
-    public ResponseEntity<Doctor> confirmLicenseUpload(
-            @RequestParam String authId,
-            @RequestParam String objectKey
-    ) {
-        return ResponseEntity.ok(registrationService.saveLicenseKey(authId, objectKey));
+        DocumentServiceGateway.PresignUploadResult result = documentServiceGateway.generateUploadUrl(
+                "private",
+                category,
+                request.getFileName(),
+                false
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "uploadUrl", result.uploadUrl(),
+                "objectKey", result.objectKey() != null ? result.objectKey() : ""
+        ));
     }
 }
