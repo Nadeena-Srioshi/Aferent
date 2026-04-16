@@ -1,7 +1,90 @@
+// package com.aferent.doctor_service.kafka;
+
+// import com.aferent.doctor_service.model.Prescription;
+// import lombok.RequiredArgsConstructor;
+// import lombok.extern.slf4j.Slf4j;
+// import org.springframework.beans.factory.annotation.Value;
+// import org.springframework.kafka.core.KafkaTemplate;
+// import org.springframework.stereotype.Component;
+
+// import java.time.LocalDateTime;
+// import java.util.HashMap;
+// import java.util.Map;
+
+// @Component
+// @RequiredArgsConstructor
+// @Slf4j
+// public class DoctorEventProducer {
+
+//     private final KafkaTemplate<String, Map<String, Object>> kafkaTemplate;
+
+//     @Value("${kafka-topics.prescription-issued:prescription.issued}")
+//     private String prescriptionIssuedTopic;
+
+//     public void sendNotification(Map<String, Object> payload) {
+//         kafkaTemplate.send("notification.send", payload);
+//         log.info("Published to notification.send channel={}", payload.get("channel"));
+//     }
+
+//     public void sendVerificationEvent(String authId, String action) {
+//         Map<String, Object> payload = new HashMap<>();
+//         payload.put("authId", authId);
+//         payload.put("action", action); // "APPROVE" or "REJECT"
+//         kafkaTemplate.send("doctor.verification.result", authId, payload);
+//         log.info("Published doctor.verification.result authId={} action={}", authId, action);
+//     }
+
+//     public void sendPrescriptionIssuedEvent(Prescription prescription) {
+//         Map<String, Object> payload = new HashMap<>();
+//         payload.put("eventType", "prescription.issued");
+//         payload.put("version", 1);
+//         payload.put("sourceService", "doctor-service");
+//         payload.put("publishedAt", LocalDateTime.now().toString());
+
+//         payload.put("prescriptionId", prescription.getPrescriptionId());
+//         payload.put("appointmentId", prescription.getAppointmentId());
+//         payload.put("consultationType", prescription.getConsultationType());
+
+//         payload.put("doctorId", prescription.getDoctorId());
+//         payload.put("doctorName", prescription.getDoctorName());
+//         payload.put("doctorSpecialization", prescription.getDoctorSpecialization());
+
+//         payload.put("hospitalId", prescription.getHospitalId());
+//         payload.put("hospitalName", prescription.getHospitalName());
+
+//         payload.put("patientId", prescription.getPatientId());
+//         payload.put("patientName", prescription.getPatientName());
+//         payload.put("patientAge", prescription.getPatientAge());
+//         payload.put("patientPhone", prescription.getPatientPhone());
+//         payload.put("patientEmail", prescription.getPatientEmail());
+
+//         payload.put("diagnosis", prescription.getDiagnosis());
+//         payload.put("symptoms", prescription.getSymptoms());
+//         payload.put("medications", prescription.getMedications());
+//         payload.put("notes", prescription.getNotes());
+//         payload.put("followUpDate", prescription.getFollowUpDate());
+
+//         payload.put("qrCodeKey", prescription.getQrCodeKey());
+//         payload.put("issuedAt", prescription.getIssuedAt());
+
+//         String key = (prescription.getPatientId() != null && !prescription.getPatientId().isBlank())
+//                 ? prescription.getPatientId()
+//                 : prescription.getPrescriptionId();
+
+//         kafkaTemplate.send(prescriptionIssuedTopic, key, payload);
+//         log.info("Published {} prescriptionId={} patientId={}",
+//                 prescriptionIssuedTopic,
+//                 prescription.getPrescriptionId(),
+//                 prescription.getPatientId());
+//     }
+// }
+
 package com.aferent.doctor_service.kafka;
 
+import com.aferent.doctor_service.model.Prescription;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +107,10 @@ public class DoctorEventProducer {
     public static final String OVERRIDE_DELETED_TOPIC = "doctor.schedule.override.deleted";
 
     private final KafkaTemplate<String, Map<String, Object>> kafkaTemplate;
+
+    @Value("${kafka-topics.prescription-issued:prescription.issued}")
+    private String prescriptionIssuedTopic;
+
 
     public void sendNotification(Map<String, Object> payload) {
         kafkaTemplate.send("notification.send", payload);
@@ -156,5 +243,49 @@ public class DoctorEventProducer {
         } catch (Exception e) {
             log.error("Failed to publish topic={} key={} reason={}", topic, key, e.getMessage());
         }
+    }
+
+    public void sendPrescriptionIssuedEvent(Prescription prescription) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("eventType", "prescription.issued");
+        payload.put("version", 1);
+        payload.put("sourceService", "doctor-service");
+        payload.put("publishedAt", LocalDateTime.now().toString());
+
+        payload.put("prescriptionId", prescription.getPrescriptionId());
+        payload.put("appointmentId", prescription.getAppointmentId());
+        payload.put("consultationType", prescription.getConsultationType());
+
+        payload.put("doctorId", prescription.getDoctorId());
+        payload.put("doctorName", prescription.getDoctorName());
+        payload.put("doctorSpecialization", prescription.getDoctorSpecialization());
+
+        payload.put("hospitalId", prescription.getHospitalId());
+        payload.put("hospitalName", prescription.getHospitalName());
+
+        payload.put("patientId", prescription.getPatientId());
+        payload.put("patientName", prescription.getPatientName());
+        payload.put("patientAge", prescription.getPatientAge());
+        payload.put("patientPhone", prescription.getPatientPhone());
+        payload.put("patientEmail", prescription.getPatientEmail());
+
+        payload.put("diagnosis", prescription.getDiagnosis());
+        payload.put("symptoms", prescription.getSymptoms());
+        payload.put("medications", prescription.getMedications());
+        payload.put("notes", prescription.getNotes());
+        payload.put("followUpDate", prescription.getFollowUpDate());
+
+        payload.put("qrCodeKey", prescription.getQrCodeKey());
+        payload.put("issuedAt", prescription.getIssuedAt());
+
+        String key = (prescription.getPatientId() != null && !prescription.getPatientId().isBlank())
+                ? prescription.getPatientId()
+                : prescription.getPrescriptionId();
+
+        kafkaTemplate.send(prescriptionIssuedTopic, key, payload);
+        log.info("Published {} prescriptionId={} patientId={}",
+                prescriptionIssuedTopic,
+                prescription.getPrescriptionId(),
+                prescription.getPatientId());
     }
 }

@@ -71,4 +71,24 @@ public class PrescriptionController {
     ) {
         return ResponseEntity.ok(prescriptionService.getPublicView(prescriptionId));
     }
+
+        // private QR signed URL endpoint
+        // accessible to issuing doctor and receiving patient only
+        @GetMapping("/prescriptions/{prescriptionId}/qr/signed-url")
+        public ResponseEntity<Map<String, String>> getPrescriptionQrSignedUrl(
+                        @PathVariable String prescriptionId,
+                        @RequestHeader("X-User-ID") String authId,
+                        @RequestHeader("X-User-Role") String role,
+                        @RequestHeader(value = "X-Patient-ID", required = false) String patientId,
+                        @RequestParam(defaultValue = "3600") int expires
+        ) {
+                String url = prescriptionService.getPrescriptionQrSignedUrl(
+                                prescriptionId,
+                                authId,
+                                role,
+                                patientId,
+                                expires
+                );
+                return ResponseEntity.ok(Map.of("url", url));
+        }
 }
