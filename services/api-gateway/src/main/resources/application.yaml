@@ -54,6 +54,12 @@ spring:
           predicates:
             - Path=/appointments/**
 
+        # APPOINTMENT SERVICE — debug endpoints (keep behind auth or remove in prod)
+        - id: appointment-service-debug
+          uri: http://appointment-service:3004
+          predicates:
+            - Path=/debug/**
+
         # PAYMENT SERVICE
         - id: payment-service
           uri: http://payment-service:3005
@@ -96,6 +102,7 @@ app:
     - /specializations/**
     - /doctors/**
     - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
+    - /debug/**           # debug endpoints — remove or restrict in production
 
 logging:
   pattern:

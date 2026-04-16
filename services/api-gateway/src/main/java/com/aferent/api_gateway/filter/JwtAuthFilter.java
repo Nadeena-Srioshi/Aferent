@@ -42,7 +42,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/specializations",
             "/prescriptions",
             "/sessions/webhooks",
-            "/actuator"
+            "/debug"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();

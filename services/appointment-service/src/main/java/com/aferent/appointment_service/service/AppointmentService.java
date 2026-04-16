@@ -40,9 +40,9 @@ public class AppointmentService {
         LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
 
         return slotRepository
-                .findByScheduleIdAndDateAndBookedFalse(doctorId, date)
+                .findByDoctorIdAndDate(doctorId, date)
                 .stream()
-                // filter by type just in case mixed schedules
+                .filter(s -> !s.isBooked())
                 .filter(s -> s.getType() == type)
                 .map(this::toSlotResponse)
                 .collect(Collectors.toList());

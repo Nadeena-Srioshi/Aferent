@@ -147,7 +147,7 @@ public class SlotGenerationService {
 
             while (cursor.plusMinutes(duration).compareTo(end) <= 0) {
                 slots.add(GeneratedSlot.builder()
-                        .scheduleId(session.getSessionId())  // Use session ID as schedule ID
+                        .scheduleId(schedule.getId())
                         .doctorId(schedule.getDoctorId())
                         .type(AppointmentType.PHYSICAL)
                         .date(date)
@@ -197,7 +197,7 @@ public class SlotGenerationService {
 
             while (cursor.plusMinutes(duration).compareTo(end) <= 0) {
                 slots.add(GeneratedSlot.builder()
-                        .scheduleId(session.getSessionId())  // Use session ID as schedule ID
+                        .scheduleId(schedule.getId())
                         .doctorId(schedule.getDoctorId())
                         .type(AppointmentType.VIDEO)
                         .date(date)
