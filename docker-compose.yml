@@ -153,6 +153,7 @@ services:
       AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE}
       AGORA_WEBHOOK_SECRET: ${AGORA_WEBHOOK_SECRET}
       AGORA_TOKEN_TTL_SEC: ${AGORA_TOKEN_TTL_SEC}
+      
   minio-event-init:
     image: minio/mc:latest
     container_name: minio-event-init
@@ -314,6 +315,27 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+  symptom-detector:
+    build:
+      context: ./services/symptom-detector
+      dockerfile: Dockerfile
+    container_name: symptom-detector
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: ${MONGO_URI_SYMPTOM_SERVICE}
+    volumes:
+      - ./services/symptom-detector/app:/app/app   # hot-reload in dev; remove in prod
+    networks: [aferent-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/ai/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   aferent-network:

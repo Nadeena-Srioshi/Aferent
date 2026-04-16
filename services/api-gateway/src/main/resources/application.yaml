@@ -73,10 +73,10 @@ spring:
             - Path=/notifications/**
 
         # AI SERVICE
-        - id: ai-service
-          uri: http://ai-service:3008
+        - id: symptom-detector
+          uri: http://symptom-detector:3008
           predicates:
-            - Path=/symptom-check/**, /prompts/**
+            - Path=/ai/**
 
 app:
   jwt:
@@ -89,6 +89,7 @@ app:
     - /auth/refresh
     - /actuator/**
     - /payments/webhook   # payment provider calls this — no JWT, uses HMAC instead
+    - /ai/api/v1/symptoms/analyse  # AI endpoint for symptom analysis — no JWT, uses API key
     - /doctors/register/profile
     - /doctors/register/license-upload-url
     - /doctors/register/license-confirm
