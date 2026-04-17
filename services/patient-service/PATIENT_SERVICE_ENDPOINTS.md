@@ -30,6 +30,7 @@ This document lists **all current `patient-service` REST endpoints** from:
 
 | Endpoint Pattern | PATIENT | DOCTOR | ADMIN |
 |---|---:|---:|---:|
+| `GET /patients` | ❌ | ❌ | ✅ |
 | `GET /patients/{patientId}` | Own only | ✅ | ✅ |
 | `GET /patients/me` | ✅ | ❌ | ❌ |
 | `PUT /patients/{patientId}` | Own only | ❌ | ❌ |
@@ -76,6 +77,65 @@ Validation errors include `validationErrors` object.
 ## Endpoints
 
 ## 1) Profile Endpoints
+
+### GET `/patients`
+List all patients for admin user management.
+
+**Access:** ADMIN only
+
+**Headers:**
+- `X-User-Role: ADMIN`
+
+**Request body:**
+- None (GET endpoint)
+
+**Example request:**
+- Method/Path: `GET /patients`
+- Headers: `X-User-Role: ADMIN`
+
+**Example response (200):** `Patient[]`
+```json
+[
+  {
+    "id": "67f4a0a9e4b0f87a6f947001",
+    "authId": "auth_patient_123",
+    "patientId": "PAT_001",
+    "email": "asha@example.com",
+    "firstName": "Asha",
+    "lastName": "Perera",
+    "phone": "+94770000000",
+    "dateOfBirth": "1998-02-21",
+    "gender": "FEMALE",
+    "bloodGroup": "O+",
+    "address": {
+      "street": "12 Main St",
+      "city": "Colombo",
+      "country": "Sri Lanka"
+    },
+    "createdAt": "2026-04-10T09:30:00",
+    "updatedAt": "2026-04-15T13:22:00"
+  },
+  {
+    "id": "67f4a0a9e4b0f87a6f947002",
+    "authId": "auth_patient_456",
+    "patientId": "PAT_002",
+    "email": "nimal@example.com",
+    "firstName": "Nimal",
+    "lastName": "Silva",
+    "phone": "+94771111111",
+    "dateOfBirth": "1992-08-10",
+    "gender": "MALE",
+    "bloodGroup": "A+",
+    "address": {
+      "street": "45 Lake Rd",
+      "city": "Kandy",
+      "country": "Sri Lanka"
+    },
+    "createdAt": "2026-04-11T10:05:00",
+    "updatedAt": "2026-04-16T09:12:00"
+  }
+]
+```
 
 ### GET `/patients/{patientId}`
 Get patient profile by patient id.

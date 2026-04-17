@@ -83,6 +83,41 @@ services:
     volumes:
       - ./logs/api-gateway:/app/logs
 
+  main-portal:
+    build:
+      context: ./client/main-portal
+    container_name: main-portal
+    networks: [aferent-network]
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+      VITE_GATEWAY_BASE_URL: http://localhost:8080
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./client/main-portal:/app
+      - main-portal-node-modules:/app/node_modules
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+  admin-portal:
+    build:
+      context: ./client/admin-portal
+    container_name: admin-portal
+    networks: [aferent-network]
+    ports:
+      - "4000:4000"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./client/admin-portal:/app
+      - admin-portal-node-modules:/app/node_modules
+    depends_on:
+      api-gateway:
+        condition: service_started
+
   postgres-telemedicine:
     image: postgres:16-alpine
     container_name: postgres-telemedicine
@@ -194,7 +229,7 @@ services:
     ports:
       - "3009:3009"
     environment:
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ENDPOINT: nginx:9000
       MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
@@ -240,12 +275,8 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
       PRESCRIPTION_BASE_URL: http://localhost:8080
+      DOCTOR_LOGIN_URL: ${DOCTOR_LOGIN_URL:-http://localhost:5173/login}
       DOCUMENT_SERVICE_URL: http://document-service:3009
       DOCUMENT_SERVICE_ID: doctor-service
     volumes:
@@ -346,3 +377,5 @@ volumes:
   kafka-data:
   telemedicine-postgres-data:
   minio-data:
+  main-portal-node-modules:
+  admin-portal-node-modules:

@@ -6,6 +6,8 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin, RETAIN_FIRST
       globalcors:
         add-to-simple-url-handler-mapping: true
         cors-configurations:
@@ -106,6 +108,7 @@ app:
     - /hospitals/**
     - /specializations/**
     - /doctors/**
+    - /appointments/slots/doctor/**
     - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
     - /debug/**           # debug endpoints — remove or restrict in production
 

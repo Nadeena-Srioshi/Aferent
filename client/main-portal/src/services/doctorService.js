@@ -43,6 +43,18 @@ export async function getHospitals() {
 	return request('/hospitals')
 }
 
+export async function searchDoctors({ specialty, name, hospital, date } = {}) {
+	const params = new URLSearchParams()
+
+	if (specialty) params.set('specialty', specialty)
+	if (name) params.set('name', name)
+	if (hospital) params.set('hospital', hospital)
+	if (date) params.set('date', date)
+
+	const query = params.toString()
+	return request(`/doctors${query ? `?${query}` : ''}`)
+}
+
 export async function getDoctorProfile({ token, doctorId }) {
 	return request(`/doctors/${doctorId}`, {
 		headers: authHeaders(token),
@@ -163,6 +175,7 @@ export async function getDoctorById(doctorId) {
 export default {
 	getSpecializations,
 	getHospitals,
+	searchDoctors,
 	getDoctorProfile,
 	updateDoctorProfile,
 	registerDoctorAuth,

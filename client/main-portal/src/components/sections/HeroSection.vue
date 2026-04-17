@@ -35,7 +35,7 @@
               Book an Appointment
             </RouterLink>
             <RouterLink
-              to="/about"
+              to="/symptoms"
               class="group inline-flex items-center justify-center gap-2 px-7 py-4 border-2 border-ai text-ai font-semibold rounded-xl hover:bg-ai transition-all duration-200 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai focus-visible:ring-offset-2"
             >
               <Sparkles class="w-5 h-5 text-ai group-hover:text-card transition-colors duration-200" aria-hidden="true" />

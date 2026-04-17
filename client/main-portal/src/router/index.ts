@@ -10,6 +10,7 @@ import RecordsView from '@/views/Recordsview.vue'
 import AppointmentsView from '@/views/AppointmentsView.vue'
 import MedicalHistoryView from '@/views/MedicalHistoryView.vue'
 import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
+import SymptomView from '@/views/SymptomView.vue'
 import DoctorDashboardView from '@/views/DoctorDashboardView.vue'
 import DoctorProfileView from '@/views/DoctorProfileView.vue'
 import DoctorScheduleView from '@/views/DoctorScheduleView.vue'
@@ -28,6 +29,11 @@ const router = createRouter({
     { path: '/login', name: 'login', component: LoginView },
     { path: '/about', name: 'about', component: AboutView },
     { path: '/find-doctor', name: 'find-doctor', component: FindDoctorView },
+    {
+      path: '/find-doctor/:doctorId/book',
+      name: 'doctor-booking',
+      component: () => import('@/views/AppointmentBookingView.vue'),
+    },
     {
       path: '/appointments',
       name: 'appointments',
@@ -51,6 +57,7 @@ const router = createRouter({
     { path: '/profile', name: 'profile', component: ProfileView },
     { path: '/records', name: 'records', component: RecordsView },
     { path: '/doctor-register', name: 'doctor-register', component: DoctorRegisterView },
+    { path: '/symptoms', name: 'symptoms-detector', component: SymptomView },
     {
       path: '/doctor/profile',
       name: 'doctor-profile',
