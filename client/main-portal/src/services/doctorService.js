@@ -53,18 +53,30 @@ export async function completeDoctorProfile(payload) {
 	})
 }
 
-export async function getLicenseUploadUrl({ authId, fileName, contentType }) {
-	const params = new URLSearchParams({ authId, fileName, contentType })
-	return request(`/doctors/register/license-upload-url?${params}`, {
+export async function getLicenseUploadUrl({ authId, fileName }) {
+	return request('/doctors/license-upload-url', {
 		method: 'POST',
+		body: JSON.stringify({ authId, fileName }),
 	})
 }
 
-export async function confirmLicenseUpload({ authId, objectKey }) {
-	const params = new URLSearchParams({ authId, objectKey })
-	return request(`/doctors/register/license-confirm?${params}`, {
-		method: 'POST',
+export async function uploadFileToPresignedUrl({ uploadUrl, file }) {
+	const headers = file?.type ? { 'Content-Type': file.type } : undefined
+	const response = await fetch(uploadUrl, {
+		method: 'PUT',
+		headers,
+		body: file,
 	})
+
+	if (!response.ok) {
+		const payload = await response.text()
+		const message = payload || 'License upload failed'
+		const error = new Error(message)
+		error.status = response.status
+		throw error
+	}
+
+	return true
 }
 
 export default {
@@ -73,5 +85,5 @@ export default {
 	registerDoctorAuth,
 	completeDoctorProfile,
 	getLicenseUploadUrl,
-	confirmLicenseUpload,
+	uploadFileToPresignedUrl,
 }

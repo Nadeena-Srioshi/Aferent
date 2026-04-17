@@ -270,6 +270,7 @@ import {
   Menu,
   Settings,
   Sparkles,
+  Stethoscope,
   UserRound,
   X,
 } from 'lucide-vue-next'
@@ -279,13 +280,13 @@ const auth     = useAuth()
 const notify   = useNotificationStore()
 
 // ── Auth state ────────────────────────────────────────────────
-const { isAuthenticated, user } = storeToRefs(auth)
+const { isAuthenticated, isDoctor, user } = storeToRefs(auth)
 
-const fullName  = computed(() => user.value?.name ?? '')
+const fullName  = computed(() => user.value?.name ?? auth.fullName ?? '')
 const firstName = computed(() => fullName.value.split(' ')[0] || 'Account')
 const userEmail = computed(() => user.value?.email ?? '')
 const initials  = computed(() =>
-  fullName.value
+  (fullName.value || auth.fullName || '')
     .split(' ')
     .map(n => n[0])
     .slice(0, 2)
@@ -303,12 +304,18 @@ const profileRef  = ref(null)
 // ── Nav links ─────────────────────────────────────────────────
 const navLinks = computed(() => (
   isAuthenticated.value
-    ? [
-        { label: 'Find a Doctor',   to: '/find-doctor' },
-        { label: 'Appointments',    to: '/appointments' },
-        { label: 'Medical History', to: '/medical-history' },
-        { label: 'Medical Records', to: '/records' },
-      ]
+    ? (isDoctor.value
+      ? [
+          { label: 'Dashboard',    to: '/doctor/dashboard' },
+          { label: 'Appointments', to: '/appointments' },
+          { label: 'Profile',      to: '/profile' },
+        ]
+      : [
+          { label: 'Find a Doctor',   to: '/find-doctor' },
+          { label: 'Appointments',    to: '/appointments' },
+          { label: 'Medical History', to: '/medical-history' },
+          { label: 'Medical Records', to: '/records' },
+        ])
     : [
         { label: 'Find a Doctor', to: '/find-doctor' },
         { label: 'About',         to: '/about' },
@@ -316,13 +323,21 @@ const navLinks = computed(() => (
 ))
 
 // ── Profile dropdown items ────────────────────────────────────
-const profileMenuItems = [
-  { label: 'My Profile',    to: '/profile',    icon: UserRound },
-  { label: 'My Appointments', to: '/appointments', icon: CalendarDays },
-  { label: 'Medical Records', to: '/records',      icon: FileText },
-  { label: 'AI Health Tools', to: '/ai-tools',     icon: Sparkles },
-  { label: 'Account Settings',to: '/settings',     icon: Settings },
-]
+const profileMenuItems = computed(() => (
+  isDoctor.value
+    ? [
+        { label: 'Doctor Dashboard', to: '/doctor/dashboard', icon: Stethoscope },
+        { label: 'My Profile',       to: '/profile',          icon: UserRound },
+        { label: 'Appointments',     to: '/appointments',     icon: CalendarDays },
+      ]
+    : [
+        { label: 'My Profile',       to: '/profile',          icon: UserRound },
+        { label: 'My Appointments',  to: '/appointments',     icon: CalendarDays },
+        { label: 'Medical Records',  to: '/records',          icon: FileText },
+        { label: 'AI Health Tools',  to: '/ai-tools',         icon: Sparkles },
+        { label: 'Account Settings', to: '/settings',         icon: Settings },
+      ]
+))
 
 // ── Actions ───────────────────────────────────────────────────
 async function handleLogout() {
