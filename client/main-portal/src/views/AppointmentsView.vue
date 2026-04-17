@@ -65,6 +65,14 @@
             >
               <template #actions>
                 <button
+                  v-if="canJoinVideoCall(appointment)"
+                  class="flex-1 py-2 text-xs font-semibold text-white bg-ai rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                  @click="joinVideoCall(appointment)"
+                >
+                  Join Video Call
+                </button>
+
+                <button
                   v-if="canInitiatePayment(appointment)"
                   class="flex-1 py-2 text-xs font-semibold text-white bg-primary rounded-xl hover:bg-action transition-colors disabled:opacity-60"
                   :disabled="actionLoadingId === appointment.id"
@@ -124,9 +132,9 @@
               <span>Status: {{ humanizeAppointmentStatus(appointment.status) }}</span>
               <span v-if="appointment.paymentId">Payment ID: {{ appointment.paymentId }}</span>
               <span v-if="appointment.videoSessionLink" class="text-ai">
-                <a :href="appointment.videoSessionLink" target="_blank" rel="noopener" class="underline">
-                  Join session link
-                </a>
+                <RouterLink :to="{ name: 'video-call', params: { appointmentId: appointment.id } }" class="underline">
+                  Join video call
+                </RouterLink>
               </span>
             </div>
           </div>
@@ -384,6 +392,17 @@ function canDoctorRespond(appointment) {
 function canDoctorComplete(appointment) {
   if (!isDoctor.value) return false
   return String(appointment?.status || '').toUpperCase() === 'CONFIRMED'
+}
+
+function canJoinVideoCall(appointment) {
+  const status = String(appointment?.status || '').toUpperCase()
+  const type = String(appointment?.type || '').toUpperCase()
+  return type === 'VIDEO' && status === 'CONFIRMED'
+}
+
+function joinVideoCall(appointment) {
+  if (!appointment?.id) return
+  router.push({ name: 'video-call', params: { appointmentId: appointment.id } })
 }
 
 async function loadPageData() {
