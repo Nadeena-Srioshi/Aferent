@@ -4,6 +4,18 @@ spring:
 
   # autoconfigure:
   #   exclude: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_ADDRESS}
+    password: ${GMAIL_APP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 
   data:
     mongodb:
@@ -32,10 +44,11 @@ twilio:
 #   from-email: ${SENDGRID_FROM_EMAIL:kaveeshasandeepani027@gmail.com}
 #   from-name: ${SENDGRID_FROM_NAME:aferent}
 
-resend:
-  api-key: ${RESEND_API_KEY:re_7rQaWBPW_34VButynyDhq6BCCEkppXxmz}
-  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
-  from-name: ${RESEND_FROM_NAME:Smart Healthcare Platform}
+# resend:
+#   api-key: ${RESEND_API_KEY:re_7rQaWBPW_34VButynyDhq6BCCEkppXxmz}
+#   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+#   from-name: ${RESEND_FROM_NAME:Smart Healthcare Platform}
+
 
 management:
   endpoints:
@@ -45,3 +58,7 @@ management:
   endpoint:
     health:
       show-details: always
+
+notification:
+  mail:
+    from-name: ${GMAIL_FROM_NAME}
