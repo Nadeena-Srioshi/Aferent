@@ -12,8 +12,12 @@ const api = axios.create({
 // Request interceptor — attach JWT to every request automatically
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('admin_token')
+  const role = localStorage.getItem('admin_role')  // Assuming you store the role
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  if (role) {
+    config.headers['X-User-Role'] = role
   }
   return config
 })

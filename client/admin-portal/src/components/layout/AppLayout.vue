@@ -91,7 +91,7 @@ async function handleLogout() {
           </svg>
         </div>
         <Transition name="label-fade">
-          <span v-if="!sidebarCollapsed" class="brand-name">MediCore</span>
+          <span v-if="!sidebarCollapsed" class="brand-name">Aferent</span>
         </Transition>
       </div>
 

@@ -81,7 +81,7 @@ async function loadDashboard() {
     }
 
     // Appointments
-    if (appointmentsRes.status === 'fulfilled') {
+    if (appointmentsRes.status === 'fulfilled' || appointmentsRes.status === 'rejected') {
       const data = appointmentsRes.value.data
       const appts = Array.isArray(data) ? data : (data?.content ?? [])
 
