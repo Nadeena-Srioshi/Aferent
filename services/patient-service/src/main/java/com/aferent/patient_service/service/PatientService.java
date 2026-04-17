@@ -12,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -87,5 +90,11 @@ public class PatientService {
         if (req.getBloodGroup() != null) patient.setBloodGroup(req.getBloodGroup());
         if (req.getAddress() != null)   patient.setAddress(req.getAddress());
         return patientRepository.save(patient);
+    }
+
+    public List<Patient> getAllPatients() {
+        return patientRepository.findAll().stream()
+                .sorted(Comparator.comparing(Patient::getPatientId, Comparator.nullsLast(String::compareTo)))
+                .toList();
     }
 }

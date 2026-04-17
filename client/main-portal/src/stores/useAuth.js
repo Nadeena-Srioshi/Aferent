@@ -49,6 +49,10 @@ function initialsFromName(name) {
     .join('')
 }
 
+function normalizeRole(role) {
+  return typeof role === 'string' ? role.trim().toUpperCase() : ''
+}
+
 export const useAuth = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem(TOKEN_STORAGE_KEY) || '',
@@ -57,7 +61,8 @@ export const useAuth = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => Boolean(state.token),
-    isPatient: (state) => state.user?.role === 'PATIENT',
+    isPatient: (state) => normalizeRole(state.user?.role) === 'PATIENT',
+    isDoctor: (state) => normalizeRole(state.user?.role) === 'DOCTOR',
     fullName: (state) => {
       const direct = state.user?.name?.trim()
       if (direct) return direct
@@ -99,7 +104,7 @@ export const useAuth = defineStore('auth', {
         ...(fallbackUser || {}),
         authId: claims.sub || fallbackUser?.authId || this.user?.authId || null,
         email: claims.email || fallbackUser?.email || this.user?.email || null,
-        role: claims.role || fallbackUser?.role || this.user?.role || null,
+        role: normalizeRole(claims.role || fallbackUser?.role || this.user?.role || null),
       }
 
       this.saveSession(token, mergedUser)

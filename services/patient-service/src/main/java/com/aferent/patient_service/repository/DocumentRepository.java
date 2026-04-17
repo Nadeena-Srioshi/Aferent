@@ -16,6 +16,12 @@ public interface DocumentRepository extends MongoRepository<PatientDocument, Str
 
     List<PatientDocument> findByPatientIdAndDocumentTypeAndDeletedFalse(String patientId, String documentType);
 
+    List<PatientDocument> findByPatientIdAndDocumentTypeInAndDeletedFalse(String patientId, List<String> documentTypes);
+
+    List<PatientDocument> findByPatientIdAndIdInAndDeletedFalse(String patientId, List<String> ids);
+
+    List<PatientDocument> findByPatientIdAndIdInAndDocumentTypeAndDeletedFalse(String patientId, List<String> ids, String documentType);
+
     List<PatientDocument> findByMinioKey(String minioKey);
 
     List<PatientDocument> findByMinioKeyAndUploadStatus(String minioKey, UploadStatus uploadStatus);

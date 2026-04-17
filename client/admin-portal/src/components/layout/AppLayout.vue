@@ -42,6 +42,16 @@ const navItems = [
     path: '/notifications',
     icon: `<path d="M9 2C9 2 5 4 5 9V13L3 15H15L13 13V9C13 4 9 2 9 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/><path d="M7 15C7 16.1 7.9 17 9 17C10.1 17 11 16.1 11 15" stroke="currentColor" stroke-width="1.4" fill="none"/>`,
   },
+  {
+    name: 'Hospitals',
+    path: '/hospitals',
+    icon: `<rect x="3" y="4" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M9 7V13M6 10H12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>`,
+  },
+  {
+    name: 'Specializations',
+    path: '/specializations',
+    icon: `<path d="M9 2L11 7H16L12 10L13 15L9 12L5 15L6 10L2 7H7L9 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>`,
+  },
 ]
 
 const currentLabel = computed(() => {

@@ -3,8 +3,10 @@ package com.aferent.patient_service.controller;
 import com.aferent.patient_service.dto.*;
 import com.aferent.patient_service.exception.ForbiddenOperationException;
 import com.aferent.patient_service.model.Patient;
+import com.aferent.patient_service.model.PatientDoctorAccess;
 import com.aferent.patient_service.model.PatientDocument;
 import com.aferent.patient_service.model.PatientDocumentType;
+import com.aferent.patient_service.service.PatientDoctorAccessService;
 import com.aferent.patient_service.service.PatientService;
 import com.aferent.patient_service.service.PatientDocumentService;
 import jakarta.validation.Valid;
@@ -23,9 +25,21 @@ public class PatientController {
 
     private final PatientService patientService;
     private final PatientDocumentService patientDocumentService;
+    private final PatientDoctorAccessService patientDoctorAccessService;
 
     // gateway injects X-User-ID header — contains the authId from auth-service
     // {id} in URL is the patientId (e.g., PAT_001)
+
+    @GetMapping
+    public ResponseEntity<List<Patient>> getAllPatients(
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        return ResponseEntity.ok(patientService.getAllPatients());
+    }
 
     @GetMapping("/{patientId}")
     public ResponseEntity<Patient> getProfile(
@@ -71,14 +85,15 @@ public class PatientController {
             @RequestHeader("X-User-ID") String authId,
             @RequestParam String fileName,
             @RequestParam String contentType,
-            @RequestParam(required = false) String documentType
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String documentSubType
     ) {
         Patient patient = patientService.getProfile(patientId);
         if (!patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
         return ResponseEntity.ok(
-                patientDocumentService.generateUploadUrl(patientId, fileName, contentType, PatientDocumentType.fromString(documentType))
+            patientDocumentService.generateUploadUrl(patientId, fileName, contentType, PatientDocumentType.fromString(documentType), documentSubType)
         );
     }
 
@@ -89,7 +104,8 @@ public class PatientController {
             @RequestParam String fileName,
             @RequestParam String contentType,
             @RequestParam(required = false) String documentType,
-            @RequestParam(required = false) String displayName
+            @RequestParam(required = false) String displayName,
+            @RequestParam(required = false) String documentSubType
         ) {
         return ResponseEntity.ok(
             patientDocumentService.generateUploadUrlForCurrentUser(
@@ -97,7 +113,8 @@ public class PatientController {
                 fileName,
                 contentType,
                 PatientDocumentType.fromString(documentType),
-                displayName
+                displayName,
+                documentSubType
             )
         );
         }
@@ -138,7 +155,21 @@ public class PatientController {
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
+        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType, role, authId));
+    }
+
+    // lightweight medical reports listing for patients
+    @GetMapping("/{patientId}/medical-reports")
+    public ResponseEntity<List<MedicalReportSummaryResponse>> getMedicalReports(
+            @PathVariable String patientId,
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        Patient patient = patientService.getProfile(patientId);
+        if (!"PATIENT".equals(role) || !patient.getAuthId().equals(authId)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+        return ResponseEntity.ok(patientDocumentService.getMedicalReportsSummary(patientId));
     }
 
     @GetMapping("/me/documents")
@@ -147,7 +178,32 @@ public class PatientController {
             @RequestParam(required = false) String documentType
     ) {
         String patientId = patientService.getProfileByAuthId(authId).getPatientId();
-        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType));
+        return ResponseEntity.ok(patientDocumentService.getDocuments(patientId, documentType, "PATIENT", authId));
+    }
+
+    @GetMapping("/me/medical-reports")
+    public ResponseEntity<List<MedicalReportSummaryResponse>> getMedicalReportsForCurrentUser(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"PATIENT".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
+        return ResponseEntity.ok(patientDocumentService.getMedicalReportsSummary(patientId));
+    }
+
+    @GetMapping("/me/documents/access")
+    public ResponseEntity<List<DocumentAccessSummaryResponse>> getMyDocumentAccess(
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"PATIENT".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        String patientId = patientService.getProfileByAuthId(authId).getPatientId();
+        return ResponseEntity.ok(patientDoctorAccessService.getActiveAccessSummariesForPatient(patientId, authId));
     }
 
     // get a presigned download URL for a specific document
@@ -162,8 +218,23 @@ public class PatientController {
         if (role.equals("PATIENT") && !patient.getAuthId().equals(authId)) {
             throw new ForbiddenOperationException("Access denied");
         }
-        String url = patientDocumentService.getDocumentDownloadUrl(patientId, documentId);
+        String url = patientDocumentService.getDocumentDownloadUrl(patientId, documentId, role, authId);
         return ResponseEntity.ok(Map.of("downloadUrl", url));
+    }
+
+    @PostMapping("/{patientId}/documents/share")
+    public ResponseEntity<PatientDoctorAccess> shareDocumentsWithDoctor(
+            @PathVariable String patientId,
+            @RequestHeader("X-User-ID") String authId,
+            @RequestHeader("X-User-Role") String role,
+            @Valid @RequestBody ShareDocumentsRequest request
+    ) {
+        if (!"PATIENT".equals(role)) {
+            throw new ForbiddenOperationException("Only patients can share documents");
+        }
+
+        PatientDoctorAccess result = patientDoctorAccessService.shareDocuments(patientId, authId, request);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/me/documents/{documentId}/download-url")

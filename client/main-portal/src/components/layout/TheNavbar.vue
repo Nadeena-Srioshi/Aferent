@@ -13,7 +13,7 @@
           class="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Aferent — go to homepage"
         >
-          <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+          <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <HeartPulse class="w-4.5 h-4.5 text-white" aria-hidden="true" />
           </div>
           <span class="text-xl font-bold text-primary tracking-tight">Aferent</span>
@@ -79,12 +79,12 @@
               >
                 <!-- Avatar initials -->
                 <div
-                  class="w-8 h-8 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center flex-shrink-0 select-none"
+                  class="w-8 h-8 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0 select-none"
                   aria-hidden="true"
                 >
                   {{ initials }}
                 </div>
-                <span class="text-sm font-semibold text-ink max-w-[120px] truncate">{{ firstName }}</span>
+                <span class="text-sm font-semibold text-ink max-w-30 truncate">{{ firstName }}</span>
                 <ChevronDown
                   class="w-4 h-4 text-muted transition-transform duration-200"
                   :class="{ 'rotate-180': profileOpen }"
@@ -124,7 +124,7 @@
                       class="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors focus-visible:outline-none focus-visible:bg-surface"
                       @click="profileOpen = false"
                     >
-                      <component :is="item.icon" class="w-4 h-4 text-muted flex-shrink-0" aria-hidden="true" />
+                      <component :is="item.icon" class="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
                       {{ item.label }}
                     </RouterLink>
                   </div>
@@ -136,7 +136,7 @@
                       class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-danger hover:bg-danger/5 transition-colors focus-visible:outline-none focus-visible:bg-danger/5"
                       @click="handleLogout"
                     >
-                      <LogOut class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                      <LogOut class="w-4 h-4 shrink-0" aria-hidden="true" />
                       Sign Out
                     </button>
                   </div>
@@ -215,7 +215,7 @@
           <div class="pt-4 border-t border-border">
             <!-- User info strip -->
             <div class="flex items-center gap-3 px-3 py-3 bg-surface rounded-xl mb-3">
-              <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center flex-shrink-0 select-none" aria-hidden="true">
+              <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0 select-none" aria-hidden="true">
                 {{ initials }}
               </div>
               <div class="min-w-0">
@@ -233,7 +233,7 @@
                 class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-ink hover:bg-surface transition-colors"
                 @click="mobileOpen = false"
               >
-                <component :is="item.icon" class="w-4 h-4 text-muted flex-shrink-0" aria-hidden="true" />
+                <component :is="item.icon" class="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
                 {{ item.label }}
               </RouterLink>
             </div>
@@ -270,6 +270,7 @@ import {
   Menu,
   Settings,
   Sparkles,
+  Stethoscope,
   UserRound,
   X,
 } from 'lucide-vue-next'
@@ -279,13 +280,13 @@ const auth     = useAuth()
 const notify   = useNotificationStore()
 
 // ── Auth state ────────────────────────────────────────────────
-const { isAuthenticated, user } = storeToRefs(auth)
+const { isAuthenticated, isDoctor, user } = storeToRefs(auth)
 
-const fullName  = computed(() => user.value?.name ?? '')
+const fullName  = computed(() => user.value?.name ?? auth.fullName ?? '')
 const firstName = computed(() => fullName.value.split(' ')[0] || 'Account')
 const userEmail = computed(() => user.value?.email ?? '')
 const initials  = computed(() =>
-  fullName.value
+  (fullName.value || auth.fullName || '')
     .split(' ')
     .map(n => n[0])
     .slice(0, 2)
@@ -303,12 +304,18 @@ const profileRef  = ref(null)
 // ── Nav links ─────────────────────────────────────────────────
 const navLinks = computed(() => (
   isAuthenticated.value
-    ? [
-        { label: 'Find a Doctor',   to: '/find-doctor' },
-        { label: 'Appointments',    to: '/appointments' },
-        { label: 'Medical History', to: '/medical-history' },
-        { label: 'Medical Records', to: '/records' },
-      ]
+    ? (isDoctor.value
+      ? [
+          { label: 'Dashboard',    to: '/doctor/dashboard' },
+          { label: 'Appointments', to: '/appointments' },
+          { label: 'Profile',      to: '/doctor/profile' },
+        ]
+      : [
+          { label: 'Find a Doctor',   to: '/find-doctor' },
+          { label: 'Appointments',    to: '/appointments' },
+          { label: 'Medical History', to: '/medical-history' },
+          { label: 'Medical Records', to: '/records' },
+        ])
     : [
         { label: 'Find a Doctor', to: '/find-doctor' },
         { label: 'About',         to: '/about' },
@@ -316,13 +323,21 @@ const navLinks = computed(() => (
 ))
 
 // ── Profile dropdown items ────────────────────────────────────
-const profileMenuItems = [
-  { label: 'My Profile',    to: '/profile',    icon: UserRound },
-  { label: 'My Appointments', to: '/appointments', icon: CalendarDays },
-  { label: 'Medical Records', to: '/records',      icon: FileText },
-  { label: 'AI Health Tools', to: '/ai-tools',     icon: Sparkles },
-  { label: 'Account Settings',to: '/settings',     icon: Settings },
-]
+const profileMenuItems = computed(() => (
+  isDoctor.value
+    ? [
+        { label: 'Doctor Dashboard', to: '/doctor/dashboard', icon: Stethoscope },
+        { label: 'My Profile',       to: '/doctor/profile',   icon: UserRound },
+        { label: 'Appointments',     to: '/appointments',     icon: CalendarDays },
+      ]
+    : [
+        { label: 'My Profile',       to: '/profile',          icon: UserRound },
+        { label: 'My Appointments',  to: '/appointments',     icon: CalendarDays },
+        { label: 'Medical Records',  to: '/records',          icon: FileText },
+        { label: 'AI Health Tools',  to: '/ai-tools',         icon: Sparkles },
+        { label: 'Account Settings', to: '/settings',         icon: Settings },
+      ]
+))
 
 // ── Actions ───────────────────────────────────────────────────
 async function handleLogout() {
