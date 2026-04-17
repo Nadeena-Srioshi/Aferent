@@ -6,8 +6,11 @@ import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.env.Environment;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -18,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -26,29 +30,49 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final SecretKey key;
+    private final List<String> publicPaths;
 
-    // Public paths — JWT validation is SKIPPED for these
-    private final List<String> publicPaths = List.of(
+        // Fallback public paths (used if app.public-paths is missing)
+        private static final List<String> DEFAULT_PUBLIC_PATHS = List.of(
             "/auth/login",
             "/auth/register",
             "/auth/refresh",
             "/auth/logout",
             "/payments/webhook",
-            "/actuator",
+            "/actuator/**",
             "/doctors/register/profile",
-            "/doctors/license-upload-url",
+            "/doctors/register/license-upload-url",
             "/doctors/register/license-confirm",
-            "/hospitals",
-            "/specializations",
-            "/prescriptions",
+            "/hospitals/**",
+            "/specializations/**",
+            "/prescriptions/**",
             "/sessions/webhooks",
-            "/debug"
-    );
+            "/debug/**"
+        );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
-    public JwtAuthFilter(@Value("${app.jwt.secret}") String secret) {
+    public JwtAuthFilter(
+            @Value("${app.jwt.secret}") String secret,
+            Environment environment
+    ) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+
+        List<String> configuredPublicPaths = Binder.get(environment)
+                .bind("app.public-paths", Bindable.listOf(String.class))
+                .orElse(List.of());
+
+        List<String> normalized = new ArrayList<>();
+        if (configuredPublicPaths != null) {
+            for (String path : configuredPublicPaths) {
+                if (path != null && !path.isBlank()) {
+                    normalized.add(path.trim());
+                }
+            }
+        }
+        this.publicPaths = normalized.isEmpty() ? DEFAULT_PUBLIC_PATHS : List.copyOf(normalized);
+
+        log.info("Loaded {} public path pattern(s) for JWT bypass: {}", this.publicPaths.size(), this.publicPaths);
     }
 
     @Override
@@ -71,9 +95,9 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // check hardcoded public paths
+        // check configured public paths from application.yaml (supports exact and Ant patterns)
         boolean isPublic = publicPaths.stream()
-                .anyMatch(p -> path.startsWith(p) || pathMatcher.match(p + "/**", path));
+            .anyMatch(p -> matchesPublicPath(path, p));
 
         if (isPublic) {
             return chain.filter(exchange);
@@ -133,5 +157,21 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return -1;   // runs after CorrelationIdFilter
+    }
+
+    private boolean matchesPublicPath(String requestPath, String configuredPath) {
+        if (configuredPath == null || configuredPath.isBlank()) {
+            return false;
+        }
+
+        String pattern = configuredPath.trim();
+
+        // If path contains wildcard tokens, treat it as an Ant pattern directly.
+        if (pattern.contains("*") || pattern.contains("?")) {
+            return pathMatcher.match(pattern, requestPath);
+        }
+
+        // Exact match or prefix segment match ("/foo" should match "/foo/bar", not "/foobar").
+        return requestPath.equals(pattern) || requestPath.startsWith(pattern + "/");
     }
 }

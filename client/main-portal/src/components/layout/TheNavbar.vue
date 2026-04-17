@@ -319,6 +319,7 @@ const navLinks = computed(() => (
     : [
         { label: 'Find a Doctor', to: '/find-doctor' },
         { label: 'About',         to: '/about' },
+        { label: 'Symptom Analyzer', to: '/symptoms' },
       ]
 ))
 
