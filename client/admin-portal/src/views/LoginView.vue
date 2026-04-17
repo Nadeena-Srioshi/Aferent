@@ -82,7 +82,7 @@ async function handleLogin() {
               <path d="M14 21V13M11 16H17" stroke="#1a3a5c" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
           </div>
-          <span class="brand-name">MediCore</span>
+          <span class="brand-name">Aferent</span>
         </div>
 
         <div class="panel-content">
@@ -109,7 +109,7 @@ async function handleLogin() {
           </div>
         </div>
 
-        <p class="panel-footer">© 2025 MediCore Platform</p>
+        <p class="panel-footer">© 2025 Aferent Platform</p>
       </div>
 
       <!-- Decorative circles -->
@@ -152,7 +152,7 @@ async function handleLogin() {
                 v-model="email"
                 type="email"
                 class="field-input"
-                placeholder="admin@medicore.lk"
+                placeholder="admin@Aferent.lk"
                 autocomplete="email"
                 :disabled="loading"
               />
