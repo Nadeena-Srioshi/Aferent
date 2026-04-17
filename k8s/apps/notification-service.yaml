@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: aferent
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: ghcr.io/nathimn/aferent-notification-service:latest
+          ports:
+            - containerPort: 3007
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: MONGO_URI_NOTIFICATION_SERVICE
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_PHONE_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: TWILIO_PHONE_NUMBER
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: RESEND_API_KEY
+            - name: RESEND_FROM_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RESEND_FROM_EMAIL
+            - name: RESEND_FROM_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RESEND_FROM_NAME
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 3007
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: aferent
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 3007
+      targetPort: 3007

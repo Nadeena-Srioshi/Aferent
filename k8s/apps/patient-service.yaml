@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  namespace: aferent
+  labels:
+    app: patient-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-service
+  template:
+    metadata:
+      labels:
+        app: patient-service
+    spec:
+      containers:
+        - name: patient-service
+          image: ghcr.io/nathimn/aferent-patient-service:latest
+          ports:
+            - containerPort: 3002
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: MONGO_URI_PATIENT_SERVICE
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: DOCUMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: DOCUMENT_SERVICE_URL
+            - name: DOCUMENT_SERVICE_ID
+              value: "patient-service"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 3002
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  namespace: aferent
+spec:
+  selector:
+    app: patient-service
+  ports:
+    - port: 3002
+      targetPort: 3002

@@ -1,0 +1,37 @@
+# Kustomization to apply all manifests in the correct order.
+# Usage: kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aferent
+
+resources:
+  # Namespace
+  - namespace.yaml
+
+  # Shared config
+  - secrets.yaml
+  - configmap.yaml
+
+  # Infrastructure (order matters — Kafka depends on Zookeeper, apps depend on Kafka)
+  - infra/zookeeper.yaml
+  - infra/kafka.yaml
+  - infra/postgres.yaml
+  - infra/redis.yaml
+  - infra/minio.yaml
+  - infra/minio-init-job.yaml
+
+  # Nginx ingress / reverse proxy
+  - ingress/nginx.yaml
+
+  # Application services
+  - apps/auth-service.yaml
+  - apps/api-gateway.yaml
+  - apps/patient-service.yaml
+  - apps/doctor-service.yaml
+  - apps/notification-service.yaml
+  - apps/appointment-service.yaml
+  - apps/payment-service.yaml
+  - apps/telemedicine-service.yaml
+  - apps/document-service.yaml
+  - apps/symptom-detector.yaml

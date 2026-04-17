@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  namespace: aferent
+  labels:
+    app: appointment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+    spec:
+      containers:
+        - name: appointment-service
+          image: ghcr.io/nathimn/aferent-appointment-service:latest
+          ports:
+            - containerPort: 3004
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: MONGO_URI_APPOINTMENT_SERVICE
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SERVER_PORT
+              value: "3004"
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: DOCTOR_SERVICE_URL
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 3004
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointment-service
+  namespace: aferent
+spec:
+  selector:
+    app: appointment-service
+  ports:
+    - port: 3004
+      targetPort: 3004

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: symptom-detector
+  namespace: aferent
+  labels:
+    app: symptom-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: symptom-detector
+  template:
+    metadata:
+      labels:
+        app: symptom-detector
+    spec:
+      containers:
+        - name: symptom-detector
+          image: ghcr.io/nathimn/aferent-symptom-detector:latest
+          ports:
+            - containerPort: 3008
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: MONGO_URI_SYMPTOM_SERVICE
+          readinessProbe:
+            httpGet:
+              path: /ai/api/v1/health
+              port: 3008
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: symptom-detector
+  namespace: aferent
+spec:
+  selector:
+    app: symptom-detector
+  ports:
+    - port: 3008
+      targetPort: 3008

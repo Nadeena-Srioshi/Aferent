@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemedicine-service
+  namespace: aferent
+  labels:
+    app: telemedicine-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemedicine-service
+  template:
+    metadata:
+      labels:
+        app: telemedicine-service
+    spec:
+      containers:
+        - name: telemedicine-service
+          image: ghcr.io/nathimn/aferent-telemedicine-service:latest
+          ports:
+            - containerPort: 3006
+          env:
+            - name: PORT
+              value: "3006"
+            - name: TELEMEDICINE_DB_DSN
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: TELEMEDICINE_DB_DSN
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_TOPIC_SESSION_EVENTS
+              value: "telemedicine.events"
+            - name: KAFKA_TOPIC_SESSION_STARTED
+              value: "telemedicine.session.started"
+            - name: APPOINTMENT_MODE
+              value: "remote"
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: APPOINTMENT_SERVICE_URL
+            - name: SESSION_LINK_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: SESSION_LINK_BASE_URL
+            - name: DEFAULT_SESSION_DURATION_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: DEFAULT_SESSION_DURATION_SEC
+            - name: WARNING_THRESHOLD_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: WARNING_THRESHOLD_SEC
+            - name: NO_SHOW_THRESHOLD_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: NO_SHOW_THRESHOLD_SEC
+            - name: RECONNECT_GRACE_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RECONNECT_GRACE_SEC
+            - name: AGORA_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: AGORA_APP_ID
+            - name: AGORA_APP_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: AGORA_APP_CERTIFICATE
+            - name: AGORA_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: AGORA_WEBHOOK_SECRET
+            - name: AGORA_TOKEN_TTL_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: AGORA_TOKEN_TTL_SEC
+            - name: RECORDING_STORAGE_VENDOR
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RECORDING_STORAGE_VENDOR
+            - name: RECORDING_STORAGE_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RECORDING_STORAGE_BUCKET
+            - name: RECORDING_STORAGE_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RECORDING_STORAGE_REGION
+            - name: RECORDING_STORAGE_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: RECORDING_STORAGE_ENDPOINT
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3006
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3006
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telemedicine-service
+  namespace: aferent
+spec:
+  selector:
+    app: telemedicine-service
+  ports:
+    - port: 3006
+      targetPort: 3006

@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-telemedicine
+  namespace: aferent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-telemedicine
+  template:
+    metadata:
+      labels:
+        app: postgres-telemedicine
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: telemedicine_db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "telemedicine", "-d", "telemedicine_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: postgres-telemedicine-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-telemedicine-pvc
+  namespace: aferent
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-telemedicine
+  namespace: aferent
+spec:
+  selector:
+    app: postgres-telemedicine
+  ports:
+    - port: 5432
+      targetPort: 5432
