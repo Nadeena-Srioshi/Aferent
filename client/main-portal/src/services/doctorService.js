@@ -178,6 +178,5 @@ export default {
 	addScheduleOverride,
 	deleteScheduleOverride,
 	uploadFileToPresignedUrl,
-	confirmLicenseUpload,
 	getDoctorById
 }
