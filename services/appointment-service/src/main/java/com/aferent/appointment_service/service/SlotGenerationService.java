@@ -108,6 +108,75 @@ public class SlotGenerationService {
     }
 
     /**
+     * Generates slots for a single override ADD session.
+     * Uses {@code sessionId} (the UUID assigned by doctor-service to the override slot)
+     * as the {@code scheduleId} on each GeneratedSlot so that the slots can be found and
+     * deleted by {@code deleteByScheduleIdAndDateAndBookedFalse} if the override is later removed.
+     */
+    public void generateSlotsForOverrideSlot(String sessionId,
+                                             String doctorId,
+                                             LocalDate date,
+                                             String startTime,
+                                             String endTime,
+                                             String type,
+                                             String hospitalName) {
+        List<GeneratedSlot> slots = new ArrayList<>();
+        try {
+            LocalTime start = LocalTime.parse(startTime, TIME_FMT);
+            LocalTime end   = LocalTime.parse(endTime,   TIME_FMT);
+
+            if ("IN_PERSON".equalsIgnoreCase(type) || "PHYSICAL".equalsIgnoreCase(type)) {
+                int duration = 15;
+                LocalTime cursor = start;
+                int number = 1;
+                while (cursor.plusMinutes(duration).compareTo(end) <= 0) {
+                    slots.add(GeneratedSlot.builder()
+                            .scheduleId(sessionId)
+                            .doctorId(doctorId)
+                            .type(AppointmentType.PHYSICAL)
+                            .date(date)
+                            .startTime(cursor)
+                            .endTime(cursor.plusMinutes(duration))
+                            .appointmentNumber(number)
+                            .hospitalName(hospitalName)
+                            .booked(false)
+                            .build());
+                    cursor = cursor.plusMinutes(duration);
+                    number++;
+                }
+            } else if ("VIDEO".equalsIgnoreCase(type)) {
+                int duration = 30;
+                LocalTime cursor = start;
+                int index = 1;
+                while (cursor.plusMinutes(duration).compareTo(end) <= 0) {
+                    slots.add(GeneratedSlot.builder()
+                            .scheduleId(sessionId)
+                            .doctorId(doctorId)
+                            .type(AppointmentType.VIDEO)
+                            .date(date)
+                            .startTime(cursor)
+                            .endTime(cursor.plusMinutes(duration))
+                            .videoSlotId(String.format("slot_%03d", index))
+                            .booked(false)
+                            .build());
+                    cursor = cursor.plusMinutes(duration);
+                    index++;
+                }
+            }
+
+            if (!slots.isEmpty()) {
+                slotRepository.saveAll(slots);
+                log.info("Generated {} override ADD slots for doctorId={} on {} sessionId={}",
+                        slots.size(), doctorId, date, sessionId);
+            } else {
+                log.warn("No override ADD slots generated for doctorId={} on {} (empty time range?)", doctorId, date);
+            }
+        } catch (Exception e) {
+            log.error("Error generating override ADD slots for doctorId={} on {}: {}", doctorId, date, e.getMessage(), e);
+        }
+    }
+
+    /**
      * Get sessions for a specific day of the week from the schedule
      */
     private List<DoctorScheduleDto.SessionDto> getSessionsForDay(
