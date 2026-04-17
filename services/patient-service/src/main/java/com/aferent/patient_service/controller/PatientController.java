@@ -30,6 +30,17 @@ public class PatientController {
     // gateway injects X-User-ID header — contains the authId from auth-service
     // {id} in URL is the patientId (e.g., PAT_001)
 
+    @GetMapping
+    public ResponseEntity<List<Patient>> getAllPatients(
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!"ADMIN".equals(role)) {
+            throw new ForbiddenOperationException("Access denied");
+        }
+
+        return ResponseEntity.ok(patientService.getAllPatients());
+    }
+
     @GetMapping("/{patientId}")
     public ResponseEntity<Patient> getProfile(
             @PathVariable String patientId,
