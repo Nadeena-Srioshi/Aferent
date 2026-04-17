@@ -1,0 +1,8 @@
+# Build artifacts
+server
+*.out
+dist/
+
+# Go
+bin/
+vendor/

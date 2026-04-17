@@ -7,8 +7,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://srioshi_db_user:28k3T9FAK9d9FIIP@cluster0.6vsdh2n.mongodb.net/notification_db?appName=Cluster0
-      #uri: ${MONGO_URI}
+      uri: ${MONGO_URI}
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
