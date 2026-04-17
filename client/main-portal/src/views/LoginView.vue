@@ -110,7 +110,7 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import { useAuth } from '@/stores/useAuth'
 import LoginIllustration from '@/components/sections/LoginIllustration.vue'
@@ -120,14 +120,32 @@ const form    = reactive({ email: '', password: '' })
 const loading = ref(false)
 const error   = ref(null)
 const router  = useRouter()
+const route   = useRoute()
 const auth    = useAuth()
+
+function normalizeRole(role) {
+  return typeof role === 'string' ? role.trim().toUpperCase() : ''
+}
 
 async function handleSubmit() {
   error.value = null
   loading.value = true
   try {
-    await auth.login({ email: form.email, password: form.password })
-    router.push('/')
+    const user = await auth.login({ email: form.email, password: form.password })
+    const role = normalizeRole(user?.role)
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+
+    if (role === 'DOCTOR') {
+      await router.push('/doctor/dashboard')
+      return
+    }
+
+    if (redirect.startsWith('/') && !redirect.startsWith('/doctor')) {
+      await router.push(redirect)
+      return
+    }
+
+    await router.push('/')
   } catch (e) {
     error.value = e?.message || 'Login failed. Please try again.'
   } finally {

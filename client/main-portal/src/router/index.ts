@@ -10,6 +10,14 @@ import RecordsView from '@/views/Recordsview.vue'
 import AppointmentsView from '@/views/AppointmentsView.vue'
 import MedicalHistoryView from '@/views/MedicalHistoryView.vue'
 import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
+import DoctorDashboardView from '@/views/DoctorDashboardView.vue'
+import DoctorProfileView from '@/views/DoctorProfileView.vue'
+import DoctorScheduleView from '@/views/DoctorScheduleView.vue'
+import { useAuth } from '@/stores/useAuth'
+
+function normalizeRole(role: unknown) {
+  return typeof role === 'string' ? role.trim().toUpperCase() : ''
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,7 +32,53 @@ const router = createRouter({
     { path: '/profile', name: 'profile', component: ProfileView },
     { path: '/records', name: 'records', component: RecordsView },
     { path: '/doctor-register', name: 'doctor-register', component: DoctorRegisterView },
+    {
+      path: '/doctor/profile',
+      name: 'doctor-profile',
+      component: DoctorProfileView,
+      meta: { requiresAuth: true, roles: ['DOCTOR'] },
+    },
+    {
+      path: '/doctor/dashboard',
+      name: 'doctor-dashboard',
+      component: DoctorDashboardView,
+      meta: { requiresAuth: true, roles: ['DOCTOR'] },
+    },
+    {
+      path: '/doctor/schedule',
+      name: 'doctor-schedule',
+      component: DoctorScheduleView,
+      meta: { requiresAuth: true, roles: ['DOCTOR'] },
+    },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuth()
+  const requiresAuth = Boolean(to.meta?.requiresAuth)
+  const routeRoles = Array.isArray(to.meta?.roles)
+    ? (to.meta.roles as string[]).map((role) => normalizeRole(role))
+    : []
+
+  if (auth.token && !auth.user) {
+    await auth.fetchMe()
+  }
+
+  if (requiresAuth && !auth.isAuthenticated) {
+    return {
+      name: 'login',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if (routeRoles.length > 0) {
+    const userRole = normalizeRole(auth.user?.role)
+    if (!routeRoles.includes(userRole)) {
+      return { name: 'landing' }
+    }
+  }
+
+  return true
 })
 
 export default router
