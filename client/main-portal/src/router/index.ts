@@ -13,6 +13,8 @@ import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
 import DoctorDashboardView from '@/views/DoctorDashboardView.vue'
 import DoctorProfileView from '@/views/DoctorProfileView.vue'
 import DoctorScheduleView from '@/views/DoctorScheduleView.vue'
+import PaymentSuccessView from '@/views/PaymentSuccessView.vue'
+import PaymentCancelView from '@/views/PaymentCancelView.vue'
 import { useAuth } from '@/stores/useAuth'
 
 function normalizeRole(role: unknown) {
@@ -26,7 +28,24 @@ const router = createRouter({
     { path: '/login', name: 'login', component: LoginView },
     { path: '/about', name: 'about', component: AboutView },
     { path: '/find-doctor', name: 'find-doctor', component: FindDoctorView },
-    { path: '/appointments', name: 'appointments', component: AppointmentsView },
+    {
+      path: '/appointments',
+      name: 'appointments',
+      component: AppointmentsView,
+      meta: { requiresAuth: true, roles: ['PATIENT', 'DOCTOR'] },
+    },
+    {
+      path: '/payment/success',
+      name: 'payment-success',
+      component: PaymentSuccessView,
+      meta: { requiresAuth: true, roles: ['PATIENT'] },
+    },
+    {
+      path: '/payment/cancel',
+      name: 'payment-cancel',
+      component: PaymentCancelView,
+      meta: { requiresAuth: true, roles: ['PATIENT'] },
+    },
     { path: '/medical-history', name: 'medical-history', component: MedicalHistoryView },
     { path: '/register', name: 'register', component: RegisterView },
     { path: '/profile', name: 'profile', component: ProfileView },
