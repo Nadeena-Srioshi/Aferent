@@ -1,38 +1,38 @@
 package com.aferent.notification_service.provider;
 
-import com.resend.Resend;
-import com.resend.services.emails.model.CreateEmailOptions;
-import com.resend.services.emails.model.CreateEmailResponse;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class EmailProvider {
 
-    @Value("${resend.api-key}")
-    private String apiKey;
+    private final JavaMailSender mailSender;
 
-    @Value("${resend.from-email}")
+    @Value("${spring.mail.username}")
     private String fromEmail;
 
-    @Value("${resend.from-name}")
+    @Value("${notification.mail.from-name}")
     private String fromName;
 
     public boolean sendEmail(String toEmail, String subject, String body) {
         try {
-            Resend resend = new Resend(apiKey);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
-            CreateEmailOptions params = CreateEmailOptions.builder()
-                .from(fromName + " <" + fromEmail + ">")
-                .to(toEmail)
-                .subject(subject)
-                .text(body)
-                .build();
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(body, false);
 
-            CreateEmailResponse response = resend.emails().send(params);
-            log.info("Email sent to {} | ID: {}", toEmail, response.getId());
+            mailSender.send(message);
+            log.info("Email sent to {}", toEmail);
             return true;
 
         } catch (Exception e) {

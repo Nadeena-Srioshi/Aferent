@@ -80,10 +80,16 @@
 			<version>4.10.2</version>
 		</dependency> -->
 
-		<dependency>
+		<!-- <dependency>
 			<groupId>com.resend</groupId>
 			<artifactId>resend-java</artifactId>
 			<version>3.1.0</version>
+		</dependency> -->
+
+				<!-- ADD THIS -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 	</dependencies>
 
