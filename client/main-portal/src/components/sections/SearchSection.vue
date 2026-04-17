@@ -112,11 +112,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Building2, CalendarDays, Search, Stethoscope, UserRound } from 'lucide-vue-next'
 import { getHospitals, getSpecializations } from '../../services/doctorService'
 
+const route = useRoute()
 const router = useRouter()
 const doctorName = ref('')
 const selectedSpecialty = ref('')
@@ -148,23 +149,50 @@ const toHospitalOptions = (items) => {
   return items
     .map((item) => {
       if (typeof item === 'string') {
-        return { value: item, label: item }
+        return { value: item, label: item, name: item }
       }
 
       if (item && typeof item === 'object') {
+        const id = item.id ?? item.name ?? null
         const name = item.name ?? null
-        if (!name) return null
+        if (!id || !name) return null
 
         const city = item.city ? String(item.city).trim() : ''
         return {
-          value: name,
+          value: id,
           label: city ? `${name} (${city})` : name,
+          name,
         }
       }
 
       return null
     })
     .filter(Boolean)
+}
+
+const syncFromRouteQuery = () => {
+  doctorName.value = typeof route.query.name === 'string' ? route.query.name.trim() : ''
+  selectedSpecialty.value = typeof route.query.specialty === 'string' ? route.query.specialty.trim() : ''
+  hospital.value = typeof route.query.hospital === 'string' ? route.query.hospital.trim() : ''
+  appointmentDate.value = typeof route.query.date === 'string' ? route.query.date.trim() : ''
+}
+
+const normalizeHospitalSelection = () => {
+  if (!hospital.value || !hospitals.value.length) return
+
+  const exactId = hospitals.value.find((option) => option.value === hospital.value)
+  if (exactId) return
+
+  const byName = hospitals.value.find((option) => {
+    const label = option.label?.toLowerCase?.() || ''
+    const name = option.name?.toLowerCase?.() || ''
+    const current = hospital.value.toLowerCase()
+    return name === current || label === current || label.startsWith(`${current} (`)
+  })
+
+  if (byName) {
+    hospital.value = byName.value
+  }
 }
 
 const loadReferenceData = async () => {
@@ -176,6 +204,7 @@ const loadReferenceData = async () => {
 
     specialties.value = toNameList(specializationsResponse)
     hospitals.value = toHospitalOptions(hospitalsResponse)
+    normalizeHospitalSelection()
   } catch (e) {
     error.value = e?.message || 'Failed to load hospitals and specializations.'
   }
@@ -205,6 +234,15 @@ const applyQuickFilter = (tag) => {
 }
 
 onMounted(() => {
+  syncFromRouteQuery()
   loadReferenceData()
 })
+
+watch(
+  () => route.query,
+  () => {
+    syncFromRouteQuery()
+    normalizeHospitalSelection()
+  }
+)
 </script>

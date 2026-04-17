@@ -108,6 +108,7 @@ app:
     - /hospitals/**
     - /specializations/**
     - /doctors/**
+    - /appointments/slots/doctor/**
     - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
     - /debug/**           # debug endpoints — remove or restrict in production
 
