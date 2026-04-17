@@ -37,7 +37,7 @@ import { useRouter, RouterView } from 'vue-router'
 
 import TheNavbar     from '@/components/layout/TheNavbar.vue'
 import TheFooter     from '@/components/layout/TheFooter.vue'
-import TheToastStack from '@/components/shared/TheToastStack.vue'
+import TheToastStack from '@/components/shared/Thetoaststack.vue'
 import ThePageLoader from '@/components/shared/ThePageLoader.vue'
 
 import { useAuth } from '@/stores/useAuth'

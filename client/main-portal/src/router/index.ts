@@ -10,6 +10,7 @@ import RecordsView from '@/views/Recordsview.vue'
 import AppointmentsView from '@/views/AppointmentsView.vue'
 import MedicalHistoryView from '@/views/MedicalHistoryView.vue'
 import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
+import SymptomView from '@/views/SymptomView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/profile', name: 'profile', component: ProfileView },
     { path: '/records', name: 'records', component: RecordsView },
     { path: '/doctor-register', name: 'doctor-register', component: DoctorRegisterView },
+    { path: '/symptoms', name: 'symptoms-detector', component: SymptomView },
   ],
 })
 
