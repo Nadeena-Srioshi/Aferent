@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import api from '@/api/axios'
 
 // ── Types ─────────────────────────────────────────────────
+type VerificationAction = 'APPROVE' | 'REJECT'
+type DoctorStatus = 'PENDING_PROFILE' | 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED'
+
 interface Doctor {
   id: string
   doctorId: string
@@ -14,7 +17,7 @@ interface Doctor {
   specialization: string
   qualifications: string[]
   hospitalAffiliations: string[]
-  verified: boolean
+  status: DoctorStatus
   consultationFee: number
   createdAt: string
   bio?: string
@@ -26,7 +29,7 @@ const doctors = ref<Doctor[]>([])
 const loading = ref(true)
 const error = ref('')
 const search = ref('')
-const verifiedFilter = ref<'' | 'verified' | 'pending'>('')
+const statusFilter = ref<'' | 'pending' | 'verified' | 'rejected'>('')
 const sortKey = ref<'name' | 'specialization' | 'createdAt'>('createdAt')
 const sortDir = ref<'asc' | 'desc'>('desc')
 const page = ref(1)
@@ -38,6 +41,8 @@ const verifySuccess = ref<string | null>(null)
 const verifyError = ref<string | null>(null)
 const showConfirm = ref(false)
 const pendingVerifyDoctor = ref<Doctor | null>(null)
+const pendingAction = ref<VerificationAction>('APPROVE')
+const rejectionReason = ref('')
 
 // ── Fetch ─────────────────────────────────────────────────
 onMounted(fetchDoctors)
@@ -45,10 +50,31 @@ onMounted(fetchDoctors)
 async function fetchDoctors() {
   loading.value = true
   error.value = ''
+  verifyError.value = null
+
   try {
-    const res = await api.get('http://localhost:8080/doctors')
-    const data = res.data
-    doctors.value = Array.isArray(data) ? data : (data?.content ?? [])
+    const [activeResult, pendingResult] = await Promise.allSettled([
+      api.get('/doctors'),
+      api.get('/admin/doctors/pending'),
+    ])
+
+    const activeDoctors = activeResult.status === 'fulfilled'
+      ? parseDoctorList(activeResult.value.data)
+      : []
+    const pendingDoctors = pendingResult.status === 'fulfilled'
+      ? parseDoctorList(pendingResult.value.data)
+      : []
+
+    if (activeResult.status === 'rejected' && pendingResult.status === 'rejected') {
+      throw new Error('Unable to load doctors from both endpoints')
+    }
+
+    const merged = mergeByDoctorId([...activeDoctors, ...pendingDoctors]).filter(isEligibleForAdminList)
+    doctors.value = merged
+
+    if (activeResult.status === 'rejected' || pendingResult.status === 'rejected') {
+      verifyError.value = 'Loaded partial doctor data. Some status groups may be incomplete.'
+    }
   } catch {
     error.value = 'Failed to load doctors.'
   } finally {
@@ -70,8 +96,9 @@ const filtered = computed(() => {
     )
   }
 
-  if (verifiedFilter.value === 'verified') list = list.filter(d => d.verified)
-  if (verifiedFilter.value === 'pending')  list = list.filter(d => !d.verified)
+  if (statusFilter.value === 'verified') list = list.filter(isVerified)
+  if (statusFilter.value === 'pending') list = list.filter(isPendingVerification)
+  if (statusFilter.value === 'rejected') list = list.filter(isRejected)
 
   list.sort((a, b) => {
     let av = '', bv = ''
@@ -91,7 +118,7 @@ const filtered = computed(() => {
   return list
 })
 
-const pendingCount = computed(() => doctors.value.filter(d => !d.verified).length)
+const pendingCount = computed(() => doctors.value.filter(isPendingVerification).length)
 const totalPages   = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
 const paginated    = computed(() => {
   const start = (page.value - 1) * pageSize
@@ -107,68 +134,158 @@ function toggleSort(key: typeof sortKey.value) {
 }
 
 // ── Verify ────────────────────────────────────────────────
-function promptVerify(doctor: Doctor) {
+function promptVerify(doctor: Doctor, action: VerificationAction) {
   pendingVerifyDoctor.value = doctor
+  pendingAction.value = action
+  rejectionReason.value = ''
   showConfirm.value = true
   verifySuccess.value = null
   verifyError.value = null
 }
 
 function cancelVerify() {
+  if (verifyingId.value) return
   showConfirm.value = false
   pendingVerifyDoctor.value = null
+  rejectionReason.value = ''
 }
 
 async function confirmVerify() {
   if (!pendingVerifyDoctor.value) return
+  if (pendingAction.value === 'REJECT' && !rejectionReason.value.trim()) {
+    verifyError.value = 'Please provide a reason before rejecting this doctor.'
+    return
+  }
+
   const doctor = pendingVerifyDoctor.value
-  showConfirm.value = false
   verifyingId.value = doctor.id
   verifySuccess.value = null
   verifyError.value = null
 
   try {
-    await api.patch(`/doctors/${doctor.doctorId}/verify`)
-    // Update local state immediately — no need to re-fetch
+    const payload = pendingAction.value === 'REJECT'
+      ? { action: 'REJECT', reason: rejectionReason.value.trim() }
+      : { action: 'APPROVE' }
+
+    await api.patch(`/admin/doctors/${doctor.doctorId}/verify`, payload)
+
     const idx = doctors.value.findIndex(d => d.id === doctor.id)
-    if (idx !== -1) doctors.value[idx].verified = true
-    verifySuccess.value = `Dr. ${fullName(doctor)} has been verified successfully.`
+    if (idx !== -1) {
+      doctors.value[idx].status = pendingAction.value === 'REJECT' ? 'SUSPENDED' : 'ACTIVE'
+    }
+
+    verifySuccess.value = pendingAction.value === 'REJECT'
+      ? `Dr. ${fullName(doctor)} has been rejected.`
+      : `Dr. ${fullName(doctor)} has been verified successfully.`
     setTimeout(() => { verifySuccess.value = null }, 4000)
+    showConfirm.value = false
   } catch (e: any) {
     verifyError.value = e.response?.data?.message ?? 'Verification failed. Please try again.'
   } finally {
     verifyingId.value = null
     pendingVerifyDoctor.value = null
+    rejectionReason.value = ''
   }
 }
 
-// async function confirmVerify() {
-//   if (!pendingVerifyDoctor.value) return
-//   const doctor = pendingVerifyDoctor.value
-//   showConfirm.value = false
-//   verifyingId.value = doctor.id
-//   verifySuccess.value = null
-//   verifyError.value = null
-
-//   try {
-    
-//     await api.patch(`/admin/doctors/${doctor.doctorId}/verify`, {
-//       action: 'APPROVE'  // Or 'REJECT' if you add UI for it
-//     })
-    
-//     const idx = doctors.value.findIndex(d => d.id === doctor.id)
-//     if (idx !== -1) doctors.value[idx].verified = true
-//     verifySuccess.value = `Dr. ${fullName(doctor)} has been verified successfully.`
-//     setTimeout(() => { verifySuccess.value = null }, 4000)
-//   } catch (e: any) {
-//     verifyError.value = e.response?.data?.message ?? 'Verification failed. Please try again.'
-//   } finally {
-//     verifyingId.value = null
-//     pendingVerifyDoctor.value = null
-//   }
-// }
-
 // ── Helpers ────────────────────────────────────────────────
+function parseDoctorList(data: unknown): Doctor[] {
+  const rawList = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { content?: unknown[] })?.content)
+      ? (data as { content: unknown[] }).content
+      : []
+
+  return rawList.map(normalizeDoctor)
+}
+
+function normalizeDoctor(raw: any): Doctor {
+  const mappedStatus = normalizeStatus(raw)
+  return {
+    id: raw.id ?? '',
+    doctorId: raw.doctorId ?? '',
+    authId: raw.authId ?? '',
+    email: raw.email ?? '',
+    firstName: raw.firstName ?? '',
+    lastName: raw.lastName ?? '',
+    phone: raw.phone ?? '',
+    specialization: raw.specialization ?? '',
+    qualifications: Array.isArray(raw.qualifications) ? raw.qualifications : [],
+    hospitalAffiliations: Array.isArray(raw.hospitalAffiliations)
+      ? raw.hospitalAffiliations
+      : Array.isArray(raw.hospitals)
+        ? raw.hospitals
+        : [],
+    status: mappedStatus,
+    consultationFee: Number(raw.consultationFee ?? 0),
+    createdAt: raw.createdAt ?? '',
+    bio: raw.bio,
+    gender: raw.gender,
+  }
+}
+
+function normalizeStatus(raw: any): DoctorStatus {
+  const status = String(raw?.status ?? '').toUpperCase()
+  if (status === 'ACTIVE' || status === 'PENDING_VERIFICATION' || status === 'SUSPENDED' || status === 'PENDING_PROFILE') {
+    return status
+  }
+
+  if (typeof raw?.verified === 'boolean') {
+    return raw.verified ? 'ACTIVE' : 'PENDING_VERIFICATION'
+  }
+
+  return 'PENDING_VERIFICATION'
+}
+
+function mergeByDoctorId(list: Doctor[]): Doctor[] {
+  const byId = new Map<string, Doctor>()
+
+  for (const doctor of list) {
+    const key = doctor.doctorId || doctor.id
+    if (!key) continue
+
+    const existing = byId.get(key)
+    if (!existing) {
+      byId.set(key, doctor)
+      continue
+    }
+
+    if (doctor.status === 'PENDING_VERIFICATION' || existing.status !== 'PENDING_VERIFICATION') {
+      byId.set(key, doctor)
+    }
+  }
+
+  return Array.from(byId.values())
+}
+
+function isEligibleForAdminList(doctor: Doctor) {
+  return doctor.status === 'ACTIVE' || doctor.status === 'PENDING_VERIFICATION' || doctor.status === 'SUSPENDED'
+}
+
+function isPendingVerification(doctor: Doctor) {
+  return doctor.status === 'PENDING_VERIFICATION'
+}
+
+function isVerified(doctor: Doctor) {
+  return doctor.status === 'ACTIVE'
+}
+
+function isRejected(doctor: Doctor) {
+  return doctor.status === 'SUSPENDED'
+}
+
+function statusLabel(doctor: Doctor) {
+  if (isVerified(doctor)) return 'Verified'
+  if (isRejected(doctor)) return 'Rejected'
+  return 'Pending'
+}
+
+function statusClass(doctor: Doctor) {
+  if (isVerified(doctor)) return 'verified'
+  if (isRejected(doctor)) return 'rejected'
+  return 'pending'
+}
+
 function fullName(d: Doctor) {
   return [d.firstName, d.lastName].filter(Boolean).join(' ') || '—'
 }
@@ -205,16 +322,16 @@ function formatFee(fee: number) {
           </span>
         </div>
         <button
-          v-if="verifiedFilter !== 'pending'"
+          v-if="statusFilter !== 'pending'"
           class="banner-filter-btn"
-          @click="verifiedFilter = 'pending'; onSearchInput()"
+          @click="statusFilter = 'pending'; onSearchInput()"
         >
           Show pending only
         </button>
         <button
           v-else
           class="banner-filter-btn"
-          @click="verifiedFilter = ''; onSearchInput()"
+          @click="statusFilter = ''; onSearchInput()"
         >
           Show all
         </button>
@@ -274,10 +391,11 @@ function formatFee(fee: number) {
         </button>
       </div>
 
-      <select v-model="verifiedFilter" @change="onSearchInput" class="filter-select">
+      <select v-model="statusFilter" @change="onSearchInput" class="filter-select">
         <option value="">All doctors</option>
-        <option value="verified">Verified only</option>
         <option value="pending">Pending verification</option>
+        <option value="verified">Verified only</option>
+        <option value="rejected">Rejected only</option>
       </select>
     </div>
 
@@ -340,7 +458,7 @@ function formatFee(fee: number) {
               </td>
             </tr>
 
-            <tr v-for="doctor in paginated" :key="doctor.id" class="data-row" :class="{ unverified: !doctor.verified }">
+            <tr v-for="doctor in paginated" :key="doctor.id" class="data-row" :class="{ pending: isPendingVerification(doctor) }">
               <!-- Doctor name + ID -->
               <td class="td-doctor">
                 <div class="doctor-cell">
@@ -373,33 +491,38 @@ function formatFee(fee: number) {
 
               <!-- Status -->
               <td>
-                <span class="verify-status" :class="doctor.verified ? 'verified' : 'pending'">
+                <span class="verify-status" :class="statusClass(doctor)">
                   <span class="status-dot"></span>
-                  {{ doctor.verified ? 'Verified' : 'Pending' }}
+                  {{ statusLabel(doctor) }}
                 </span>
               </td>
 
               <!-- Action -->
               <td class="td-action" @click.stop>
-                <button
-                  v-if="!doctor.verified"
-                  class="verify-btn"
-                  :disabled="verifyingId === doctor.id"
-                  @click="promptVerify(doctor)"
-                >
-                  <span v-if="verifyingId === doctor.id" class="spinner"></span>
-                  <svg v-else width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/>
-                    <path d="M4 6.5L5.8 8.5L9.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  {{ verifyingId === doctor.id ? 'Verifying…' : 'Verify' }}
-                </button>
-                <span v-else class="verified-tick">
+                <div v-if="isPendingVerification(doctor)" class="action-group">
+                  <button
+                    class="action-btn approve"
+                    :disabled="verifyingId === doctor.id"
+                    @click="promptVerify(doctor, 'APPROVE')"
+                  >
+                    <span v-if="verifyingId === doctor.id" class="spinner"></span>
+                    <template v-else>Approve</template>
+                  </button>
+                  <button
+                    class="action-btn reject"
+                    :disabled="verifyingId === doctor.id"
+                    @click="promptVerify(doctor, 'REJECT')"
+                  >
+                    Reject
+                  </button>
+                </div>
+                <span v-else-if="isVerified(doctor)" class="verified-tick">
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                     <circle cx="7.5" cy="7.5" r="6.5" fill="#d1fae5"/>
                     <path d="M4.5 7.5L6.5 9.5L10.5 5.5" stroke="#065f46" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </span>
+                <span v-else class="rejected-label">Rejected</span>
               </td>
             </tr>
           </tbody>
@@ -438,28 +561,55 @@ function formatFee(fee: number) {
     <Transition name="modal-fade">
       <div v-if="showConfirm" class="modal-overlay" @click.self="cancelVerify">
         <div class="modal">
-          <div class="modal-icon">
+          <div class="modal-icon" :class="{ danger: pendingAction === 'REJECT' }">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="1.5"/>
-              <path d="M7 12L10 15L17 8" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="12" r="10" :stroke="pendingAction === 'REJECT' ? '#ef4444' : '#10b981'" stroke-width="1.5"/>
+              <path
+                v-if="pendingAction !== 'REJECT'"
+                d="M7 12L10 15L17 8"
+                stroke="#10b981"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                v-else
+                d="M8 8L16 16M16 8L8 16"
+                stroke="#ef4444"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
             </svg>
           </div>
-          <h3 class="modal-title">Verify doctor registration</h3>
+          <h3 class="modal-title">
+            {{ pendingAction === 'REJECT' ? 'Reject doctor registration' : 'Verify doctor registration' }}
+          </h3>
           <p class="modal-body">
-            You are about to verify
+            You are about to {{ pendingAction === 'REJECT' ? 'reject' : 'verify' }}
             <strong>Dr. {{ pendingVerifyDoctor ? fullName(pendingVerifyDoctor) : '' }}</strong>
             ({{ pendingVerifyDoctor?.specialization ?? 'Unknown specialty' }}).
             <br/><br/>
-            This will allow them to accept appointments and conduct consultations on the platform.
+            {{ pendingAction === 'REJECT'
+              ? 'They will not be allowed to use the platform until re-approved by an admin.'
+              : 'This will allow them to accept appointments and conduct consultations on the platform.' }}
           </p>
+          <div v-if="pendingAction === 'REJECT'" class="reason-block">
+            <label class="reason-label" for="reject-reason">Rejection reason</label>
+            <textarea
+              id="reject-reason"
+              v-model="rejectionReason"
+              class="reason-input"
+              rows="3"
+              placeholder="Provide a short reason for rejection"
+            ></textarea>
+          </div>
           <div class="modal-actions">
-            <button class="modal-cancel" @click="cancelVerify">Cancel</button>
-            <button class="modal-confirm" @click="confirmVerify">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3"/>
-                <path d="M4 7L6 9L10 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Confirm verification
+            <button class="modal-cancel" :disabled="!!verifyingId" @click="cancelVerify">Cancel</button>
+            <button class="modal-confirm" :class="{ danger: pendingAction === 'REJECT' }" :disabled="!!verifyingId" @click="confirmVerify">
+              <span v-if="verifyingId" class="spinner modal-spinner"></span>
+              <template v-else>
+                {{ pendingAction === 'REJECT' ? 'Confirm rejection' : 'Confirm verification' }}
+              </template>
             </button>
           </div>
         </div>
@@ -725,8 +875,8 @@ th.sortable:hover { color: #0f2744; }
 }
 .data-row:last-child { border-bottom: none; }
 .data-row:hover { background: #f8f9fc; }
-.data-row.unverified { background: #fffdf7; }
-.data-row.unverified:hover { background: #fffbeb; }
+.data-row.pending { background: #fffdf7; }
+.data-row.pending:hover { background: #fffbeb; }
 
 td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
 
@@ -782,6 +932,10 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
   background: rgba(245,158,11,0.1);
   color: #92400e;
 }
+.verify-status.rejected {
+  background: rgba(239,68,68,0.1);
+  color: #991b1b;
+}
 .status-dot {
   width: 6px;
   height: 6px;
@@ -790,30 +944,51 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
 }
 .verify-status.verified .status-dot { background: #10b981; }
 .verify-status.pending .status-dot  { background: #f59e0b; animation: pulse 2s infinite; }
+.verify-status.rejected .status-dot { background: #ef4444; }
 
-/* Verify / verified buttons */
-.verify-btn {
+/* Action buttons */
+.action-group {
+  display: inline-flex;
+  gap: 6px;
+}
+.action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 4px;
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
   font-weight: 500;
-  color: #065f46;
-  background: rgba(16,185,129,0.1);
-  border: 1px solid rgba(16,185,129,0.25);
   border-radius: 7px;
-  padding: 5px 12px;
+  padding: 5px 10px;
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;
 }
-.verify-btn:hover:not(:disabled) { background: rgba(16,185,129,0.18); }
-.verify-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.action-btn.approve {
+  color: #065f46;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.25);
+}
+.action-btn.approve:hover:not(:disabled) { background: rgba(16,185,129,0.18); }
+.action-btn.reject {
+  color: #991b1b;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.action-btn.reject:hover:not(:disabled) { background: rgba(239,68,68,0.18); }
+.action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .verified-tick {
   display: inline-flex;
   align-items: center;
+}
+.rejected-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #991b1b;
 }
 
 .spinner {
@@ -903,6 +1078,7 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
   justify-content: center;
   margin-bottom: 4px;
 }
+.modal-icon.danger { background: rgba(239,68,68,0.1); }
 .modal-title {
   font-family: 'Syne', sans-serif;
   font-size: 18px;
@@ -921,6 +1097,33 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
   gap: 10px;
   width: 100%;
   margin-top: 8px;
+}
+.reason-block {
+  width: 100%;
+  text-align: left;
+}
+.reason-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3d4a5c;
+  margin-bottom: 6px;
+}
+.reason-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 78px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 9px 10px;
+  color: #0f2744;
+  outline: none;
+}
+.reason-input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
 }
 .modal-cancel {
   flex: 1;
@@ -954,6 +1157,17 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
   transition: background 0.15s;
 }
 .modal-confirm:hover { background: #059669; }
+.modal-confirm.danger { background: #ef4444; }
+.modal-confirm.danger:hover { background: #dc2626; }
+.modal-cancel:disabled,
+.modal-confirm:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.modal-spinner {
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: white;
+}
 
 /* ── Transitions ─────────────────────────────────────────── */
 .slide-down-enter-active, .slide-down-leave-active { transition: all 0.25s ease; }

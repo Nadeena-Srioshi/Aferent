@@ -61,7 +61,7 @@ async function loadDashboard() {
     // Parallel fetches
     const [patientsRes, doctorsRes, appointmentsRes, paymentsRes] = await Promise.allSettled([
       api.get('/patients'),
-      api.get('http://localhost:8080/doctors'),
+      api.get('/doctors'),
       api.get('/appointments'),
       api.get('/payments'),
     ])
@@ -77,11 +77,11 @@ async function loadDashboard() {
       const data = doctorsRes.value.data
       const doctors = Array.isArray(data) ? data : (data?.content ?? [])
       stats.value.totalDoctors = doctors.length
-      stats.value.pendingVerifications = doctors.filter((d: any) => !d.verified).length
+      stats.value.pendingVerifications = doctors.filter((d: any) => d.status === 'PENDING_VERIFICATION').length
     }
 
     // Appointments
-    if (appointmentsRes.status === 'fulfilled' || appointmentsRes.status === 'rejected') {
+    if (appointmentsRes.status === 'fulfilled') {
       const data = appointmentsRes.value.data
       const appts = Array.isArray(data) ? data : (data?.content ?? [])
 
@@ -465,7 +465,6 @@ function typeLabel(t: string) {
   justify-content: center;
   flex-shrink: 0;
 }
-.stat-body {}
 .stat-label {
   font-size: 12px;
   color: #8a94a6;
