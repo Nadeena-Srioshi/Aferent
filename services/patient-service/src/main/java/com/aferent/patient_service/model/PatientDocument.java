@@ -30,6 +30,7 @@ public class PatientDocument {
     private String visibility;    // public or private
     private String category;      // e.g. medical-reports/PAT_004
     private String documentType;  // e.g. "LAB_REPORT", "PRESCRIPTION", "SCAN"
+    private String documentSubType; // e.g. "LAB_REPORT", "IMAGING", "REFERRAL", "OTHER"
     @Builder.Default
     private UploadStatus uploadStatus = UploadStatus.PENDING_UPLOAD;
 
