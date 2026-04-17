@@ -18,8 +18,13 @@ public class DoctorProfileController {
     private final DoctorProfileService profileService;
 
     @GetMapping
-    public ResponseEntity<List<Doctor>> getAllActiveDoctors() {
-        return ResponseEntity.ok(profileService.getAllActiveDoctors());
+    public ResponseEntity<List<Doctor>> getAllActiveDoctors(
+            @RequestParam(required = false) String specialty,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String hospital,
+            @RequestParam(required = false) String date
+    ) {
+        return ResponseEntity.ok(profileService.searchActiveDoctors(specialty, name, hospital, date));
     }
 
     // get any doctor profile — patients and admins can also call this

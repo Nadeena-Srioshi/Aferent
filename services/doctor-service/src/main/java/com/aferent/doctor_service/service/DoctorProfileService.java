@@ -4,16 +4,25 @@ import com.aferent.doctor_service.dto.UpdateProfileRequest;
 import com.aferent.doctor_service.exception.ForbiddenOperationException;
 import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Doctor;
+import com.aferent.doctor_service.model.Hospital;
+import com.aferent.doctor_service.model.ScheduleOverride;
+import com.aferent.doctor_service.model.WeeklySchedule;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import com.aferent.doctor_service.repository.HospitalRepository;
+import com.aferent.doctor_service.repository.ScheduleOverrideRepository;
+import com.aferent.doctor_service.repository.WeeklyScheduleRepository;
 import com.aferent.doctor_service.service.DocumentServiceGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -22,10 +31,49 @@ public class DoctorProfileService {
 
     private final DoctorRepository doctorRepository;
     private final HospitalRepository hospitalRepository;
+    private final WeeklyScheduleRepository weeklyScheduleRepository;
+    private final ScheduleOverrideRepository scheduleOverrideRepository;
     private final DocumentServiceGateway documentServiceGateway;
 
     public List<Doctor> getAllActiveDoctors() {
         return doctorRepository.findByStatus(Doctor.RegistrationStatus.ACTIVE);
+    }
+
+    public List<Doctor> searchActiveDoctors(String specialty, String name, String hospital, String date) {
+        String normalizedSpecialty = normalize(specialty);
+        String normalizedName = normalize(name);
+        String normalizedHospital = normalize(hospital);
+
+        if (normalizedSpecialty == null) {
+            throw new IllegalArgumentException("specialty query parameter is required");
+        }
+
+        LocalDate requestedDate = parseOptionalDate(date);
+        Set<String> hospitalIds = resolveHospitalIds(normalizedHospital);
+
+        return doctorRepository.findByStatus(Doctor.RegistrationStatus.ACTIVE)
+                .stream()
+                .filter(doctor -> containsIgnoreCase(doctor.getSpecialization(), normalizedSpecialty))
+                .filter(doctor -> {
+                    if (normalizedName == null) return true;
+                    String fullName = ((doctor.getFirstName() == null ? "" : doctor.getFirstName()) + " "
+                            + (doctor.getLastName() == null ? "" : doctor.getLastName())).trim();
+                    return containsIgnoreCase(fullName, normalizedName)
+                            || containsIgnoreCase(doctor.getFirstName(), normalizedName)
+                            || containsIgnoreCase(doctor.getLastName(), normalizedName);
+                })
+                .filter(doctor -> {
+                    if (normalizedHospital == null) return true;
+                    List<String> assignedHospitals = doctor.getHospitals();
+                    if (assignedHospitals == null || assignedHospitals.isEmpty()) return false;
+                    if (!hospitalIds.isEmpty()) {
+                        return assignedHospitals.stream().anyMatch(hospitalIds::contains);
+                    }
+                    return false;
+                })
+                .filter(doctor -> requestedDate == null
+                        || hasAvailabilityOnDate(doctor.getDoctorId(), requestedDate, hospitalIds))
+                .toList();
     }
 
     public Doctor getProfile(String doctorId) {
@@ -179,5 +227,108 @@ public class DoctorProfileService {
         }
 
         return doctor;
+    }
+
+    private LocalDate parseOptionalDate(String date) {
+        String normalizedDate = normalize(date);
+        if (normalizedDate == null) return null;
+
+        try {
+            return LocalDate.parse(normalizedDate);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("date must be in YYYY-MM-DD format");
+        }
+    }
+
+    private Set<String> resolveHospitalIds(String hospitalQuery) {
+        if (hospitalQuery == null) return Set.of();
+
+        List<Hospital> hospitals = hospitalRepository.findByActiveTrue();
+        Set<String> resolved = new HashSet<>();
+
+        for (Hospital h : hospitals) {
+            if (h == null || h.getId() == null) continue;
+
+            if (hospitalQuery.equalsIgnoreCase(h.getId())) {
+                resolved.add(h.getId());
+                continue;
+            }
+
+            String name = h.getName();
+            if (name != null && name.toLowerCase().contains(hospitalQuery.toLowerCase())) {
+                resolved.add(h.getId());
+            }
+        }
+
+        return resolved;
+    }
+
+    private boolean hasAvailabilityOnDate(String doctorId, LocalDate date, Set<String> hospitalIds) {
+        WeeklySchedule weeklySchedule = weeklyScheduleRepository.findByDoctorId(doctorId).orElse(null);
+        if (weeklySchedule == null) {
+            return false;
+        }
+
+        List<WeeklySchedule.DaySchedule> baseSlots = getSlotsByDay(weeklySchedule, date);
+        if (baseSlots == null) {
+            baseSlots = List.of();
+        }
+
+        ScheduleOverride override = scheduleOverrideRepository.findByDoctorIdAndDate(doctorId, date).orElse(null);
+        if (override != null) {
+            switch (override.getAction()) {
+                case BLOCK:
+                    return false;
+                case ADD:
+                    return hasMatchingHospitalSlot(override.getSlots(), hospitalIds);
+                case CANCEL_SESSION:
+                    String cancelledSessionId = override.getSessionId();
+                    List<WeeklySchedule.DaySchedule> remaining = baseSlots.stream()
+                            .filter(slot -> slot != null && (cancelledSessionId == null
+                                    || !cancelledSessionId.equals(slot.getSessionId())))
+                            .toList();
+                    return hasMatchingHospitalSlot(remaining, hospitalIds);
+                default:
+                    return hasMatchingHospitalSlot(baseSlots, hospitalIds);
+            }
+        }
+
+        return hasMatchingHospitalSlot(baseSlots, hospitalIds);
+    }
+
+    private List<WeeklySchedule.DaySchedule> getSlotsByDay(WeeklySchedule schedule, LocalDate date) {
+        if (schedule == null || date == null) return List.of();
+
+        return switch (date.getDayOfWeek()) {
+            case MONDAY -> schedule.getMonday();
+            case TUESDAY -> schedule.getTuesday();
+            case WEDNESDAY -> schedule.getWednesday();
+            case THURSDAY -> schedule.getThursday();
+            case FRIDAY -> schedule.getFriday();
+            case SATURDAY -> schedule.getSaturday();
+            case SUNDAY -> schedule.getSunday();
+        };
+    }
+
+    private boolean hasMatchingHospitalSlot(List<WeeklySchedule.DaySchedule> slots, Set<String> hospitalIds) {
+        if (slots == null || slots.isEmpty()) return false;
+        if (hospitalIds == null || hospitalIds.isEmpty()) {
+            return slots.stream().anyMatch(slot -> slot != null);
+        }
+
+        return slots.stream().anyMatch(slot -> slot != null
+                && slot.getHospital() != null
+                && hospitalIds.contains(slot.getHospital()));
+    }
+
+    private String normalize(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        if (value == null || query == null) return false;
+        return value.toLowerCase().contains(query.toLowerCase());
     }
 }
