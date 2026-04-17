@@ -33,13 +33,16 @@ public class AppointmentController {
                 appointmentService.getAvailableSlotsBySchedule(scheduleId, date));
     }
 
-    // Patient browses all available slots for a doctor by type and date
-    // GET /appointments/slots/doctor/{doctorId}?type=PHYSICAL&date=2025-04-07
+        // Patient browses available slots for a doctor.
+        // doctorId is required; type and date are optional filters.
+        // GET /appointments/slots/doctor/{doctorId}
+        // GET /appointments/slots/doctor/{doctorId}?date=2025-04-07
+        // GET /appointments/slots/doctor/{doctorId}?type=PHYSICAL&date=2025-04-07
     @GetMapping("/slots/doctor/{doctorId}")
     public ResponseEntity<List<SlotResponse>> getSlotsByDoctor(
             @PathVariable String doctorId,
-            @RequestParam AppointmentType type,
-            @RequestParam String date) {
+            @RequestParam(required = false) AppointmentType type,
+            @RequestParam(required = false) String date) {
         return ResponseEntity.ok(
                 appointmentService.getAvailableSlots(doctorId, type, date));
     }

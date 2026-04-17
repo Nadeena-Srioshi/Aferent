@@ -100,12 +100,13 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import Doctorcard from '@/components/shared/Doctorcard.vue'
 import SearchSection from '@/components/sections/SearchSection.vue'
 import { getHospitals, searchDoctors } from '@/services/doctorService'
 
 const route = useRoute()
+const router = useRouter()
 const doctors = ref([])
 const hospitals = ref([])
 const loading = ref(false)
@@ -133,8 +134,18 @@ const selectedHospitalLabel = computed(() => {
 })
 
 function selectDoctor(doctor) {
-  // Placeholder action: keep the flow on the results page until booking/details routes are added.
-  console.info('Selected doctor:', doctor)
+  if (!doctor?.id) return
+
+  const query = {}
+  if (search.value.date) {
+    query.date = search.value.date
+  }
+
+  router.push({
+    name: 'doctor-booking',
+    params: { doctorId: doctor.id },
+    query,
+  })
 }
 
 function mapDoctorToCard(doctor) {

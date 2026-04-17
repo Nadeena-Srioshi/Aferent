@@ -30,6 +30,11 @@ const router = createRouter({
     { path: '/about', name: 'about', component: AboutView },
     { path: '/find-doctor', name: 'find-doctor', component: FindDoctorView },
     {
+      path: '/find-doctor/:doctorId/book',
+      name: 'doctor-booking',
+      component: () => import('@/views/AppointmentBookingView.vue'),
+    },
+    {
       path: '/appointments',
       name: 'appointments',
       component: AppointmentsView,

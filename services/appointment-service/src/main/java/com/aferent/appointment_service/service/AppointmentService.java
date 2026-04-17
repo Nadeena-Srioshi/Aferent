@@ -18,6 +18,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,14 +43,24 @@ public class AppointmentService {
 
     public List<SlotResponse> getAvailableSlots(
             String doctorId, AppointmentType type, String dateStr) {
+        LocalDate selectedDate = (dateStr != null && !dateStr.isBlank())
+            ? LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
+            : null;
 
-        LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+        LocalDate today = LocalDate.now();
 
-        return slotRepository
-                .findByDoctorIdAndDate(doctorId, date)
+        List<GeneratedSlot> slots = (selectedDate != null)
+            ? slotRepository.findByDoctorIdAndDate(doctorId, selectedDate)
+            : slotRepository.findByDoctorId(doctorId);
+
+        return slots
                 .stream()
                 .filter(s -> !s.isBooked())
-                .filter(s -> s.getType() == type)
+            .filter(s -> type == null || s.getType() == type)
+            .filter(s -> selectedDate != null || !s.getDate().isBefore(today))
+            .sorted(Comparator
+                .comparing(GeneratedSlot::getDate)
+                .thenComparing(GeneratedSlot::getStartTime))
                 .map(this::toSlotResponse)
                 .collect(Collectors.toList());
     }

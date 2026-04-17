@@ -67,9 +67,16 @@ export async function getAvailableSlots({ scheduleId, date } = {}) {
 }
 
 export async function getDoctorAvailableSlots({ doctorId, type, date } = {}) {
-  return request(
-    `/appointments/slots/doctor/${encodeURIComponent(doctorId)}?type=${encodeURIComponent(type)}&date=${encodeURIComponent(date)}`,
-  )
+  const query = new URLSearchParams()
+  if (typeof type === 'string' && type.trim()) {
+    query.set('type', type.trim())
+  }
+  if (typeof date === 'string' && date.trim()) {
+    query.set('date', date.trim())
+  }
+
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return request(`/appointments/slots/doctor/${encodeURIComponent(doctorId)}${suffix}`)
 }
 
 export async function bookAppointment({ token, userId, userEmail, role = 'PATIENT', payload } = {}) {
