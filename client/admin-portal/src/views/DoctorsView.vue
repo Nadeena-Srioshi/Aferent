@@ -46,7 +46,7 @@ async function fetchDoctors() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('http://localhost:8080/doctors')
+    const res = await api.get('/doctors')
     const data = res.data
     doctors.value = Array.isArray(data) ? data : (data?.content ?? [])
   } catch {

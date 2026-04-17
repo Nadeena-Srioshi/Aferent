@@ -336,12 +336,12 @@
             </div>
           </transition>
 
-          <!-- ── STEP 3: License upload (optional for now) ── -->
+          <!-- ── STEP 3: License upload ── -->
           <transition name="fade-slide" mode="out-in">
             <div v-if="currentStep === 3" key="step3">
               <div class="mb-7">
-                <h1 class="text-xl font-semibold text-ink mb-1">License upload (optional)</h1>
-                <p class="text-sm text-muted">Step 3 of 3 — you can skip this for now and complete registration.</p>
+                <h1 class="text-xl font-semibold text-ink mb-1">License upload</h1>
+                <p class="text-sm text-muted">Step 3 of 3 — upload your license document to complete registration.</p>
               </div>
 
               <div class="space-y-5">
@@ -382,7 +382,7 @@
                     <p class="text-xs text-muted">{{ formatFileSize(licenseFile.size) }}</p>
                     <button
                       type="button"
-                      @click.stop="licenseFile = null"
+                      @click.stop="removeLicenseFile"
                       class="text-xs text-danger hover:underline mt-1"
                     >Remove</button>
                   </div>
@@ -396,7 +396,7 @@
                 <div class="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-primary/5 border border-primary/15">
                   <Info class="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden="true" />
                   <p class="text-xs text-primary/80 leading-relaxed">
-                    License upload is temporarily optional while we finish this backend endpoint. You can complete registration now and upload it later.
+                    Upload a valid PDF, JPG, or PNG file (max 10MB). Your registration is completed after the upload succeeds.
                   </p>
                 </div>
 
@@ -412,7 +412,7 @@
                     class="w-full py-3 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed bg-primary hover:bg-action active:scale-[0.99]"
                   >
                     <span v-if="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>
-                    {{ loading ? 'Finalizing…' : 'Complete Registration' }}
+                    {{ loading ? 'Uploading…' : 'Complete Registration' }}
                   </button>
                 </div>
               </div>
@@ -459,6 +459,9 @@ const showPassword = ref(false)
 const fileInput = ref(null)
 const licenseFile = ref(null)
 const dragOver = ref(false)
+const MAX_LICENSE_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_LICENSE_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+const ALLOWED_LICENSE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
 
 // Reference data
 const specializations = ref([])
@@ -486,7 +489,7 @@ const doctorProfile = reactive({
 const steps = [
   { title: 'Account credentials', desc: 'Email and password' },
   { title: 'Professional profile', desc: 'Specialization, license, experience' },
-  { title: 'License document', desc: 'Optional for now' },
+  { title: 'License document', desc: 'Required for completion' },
 ]
 
 // ── Load reference data ──
@@ -535,15 +538,59 @@ function triggerFileInput() {
   fileInput.value?.click()
 }
 
+function validateLicenseFile(file) {
+  if (!file) return 'License document is required.'
+
+  const extension = file.name.includes('.')
+    ? file.name.split('.').pop().toLowerCase()
+    : ''
+
+  const isAllowedMimeType = !file.type || ALLOWED_LICENSE_MIME_TYPES.includes(file.type)
+  const isAllowedExtension = ALLOWED_LICENSE_EXTENSIONS.includes(extension)
+
+  if (!isAllowedMimeType || !isAllowedExtension) {
+    return 'Only PDF, JPG, or PNG files are allowed.'
+  }
+
+  if (file.size > MAX_LICENSE_FILE_SIZE) {
+    return 'File size must be 10MB or less.'
+  }
+
+  return null
+}
+
+function setLicenseFile(file) {
+  const validationError = validateLicenseFile(file)
+  if (validationError) {
+    fieldErr.license = validationError
+    return
+  }
+
+  licenseFile.value = file
+  delete fieldErr.license
+}
+
 function onFileChange(e) {
   const file = e.target.files?.[0]
-  if (file) licenseFile.value = file
+  if (file) {
+    setLicenseFile(file)
+  }
 }
 
 function onDrop(e) {
   dragOver.value = false
   const file = e.dataTransfer.files?.[0]
-  if (file) licenseFile.value = file
+  if (file) {
+    setLicenseFile(file)
+  }
+}
+
+function removeLicenseFile() {
+  licenseFile.value = null
+  delete fieldErr.license
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 }
 
 // ── STEP 1: Auth register as DOCTOR ──
@@ -617,16 +664,40 @@ async function submitStep2() {
   }
 }
 
-// ── STEP 3: Upload license and confirm ──
+// ── STEP 3: Upload license ──
 async function submitStep3() {
   clearErrors()
+  if (!authResult.value?.authId) {
+    globalError.value = 'Registration session expired. Please start again.'
+    return
+  }
+
+  const validationError = validateLicenseFile(licenseFile.value)
+  if (validationError) {
+    fieldErr.license = validationError
+    return
+  }
+
   loading.value = true
   try {
-    // License endpoint is still in progress, so Step 3 is non-blocking for now.
-    notify.push('Registration complete! License upload can be added later.', 'success')
+    const { uploadUrl } = await doctorService.getLicenseUploadUrl({
+      authId: authResult.value.authId,
+      fileName: licenseFile.value.name,
+    })
+
+    if (!uploadUrl) {
+      throw new Error('Could not start file upload. Please try again.')
+    }
+
+    await doctorService.uploadFileToPresignedUrl({
+      uploadUrl,
+      file: licenseFile.value,
+    })
+
+    notify.push('Registration complete! License uploaded successfully.', 'success')
     router.push('/login')
   } catch (e) {
-    globalError.value = e?.message || 'Could not finalize registration. Please try again.'
+    globalError.value = e?.message || 'Could not upload your license. Please try again.'
   } finally {
     loading.value = false
   }
