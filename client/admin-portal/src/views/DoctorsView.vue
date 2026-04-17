@@ -46,7 +46,7 @@ async function fetchDoctors() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/doctors')
+    const res = await api.get('http://localhost:8080/doctors')
     const data = res.data
     doctors.value = Array.isArray(data) ? data : (data?.content ?? [])
   } catch {
@@ -141,6 +141,32 @@ async function confirmVerify() {
     pendingVerifyDoctor.value = null
   }
 }
+
+// async function confirmVerify() {
+//   if (!pendingVerifyDoctor.value) return
+//   const doctor = pendingVerifyDoctor.value
+//   showConfirm.value = false
+//   verifyingId.value = doctor.id
+//   verifySuccess.value = null
+//   verifyError.value = null
+
+//   try {
+    
+//     await api.patch(`/admin/doctors/${doctor.doctorId}/verify`, {
+//       action: 'APPROVE'  // Or 'REJECT' if you add UI for it
+//     })
+    
+//     const idx = doctors.value.findIndex(d => d.id === doctor.id)
+//     if (idx !== -1) doctors.value[idx].verified = true
+//     verifySuccess.value = `Dr. ${fullName(doctor)} has been verified successfully.`
+//     setTimeout(() => { verifySuccess.value = null }, 4000)
+//   } catch (e: any) {
+//     verifyError.value = e.response?.data?.message ?? 'Verification failed. Please try again.'
+//   } finally {
+//     verifyingId.value = null
+//     pendingVerifyDoctor.value = null
+//   }
+// }
 
 // ── Helpers ────────────────────────────────────────────────
 function fullName(d: Doctor) {
