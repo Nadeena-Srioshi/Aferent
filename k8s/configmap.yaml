@@ -1,0 +1,41 @@
+# Non-secret configuration shared across services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aferent-config
+  namespace: aferent
+data:
+  # Kafka
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+
+  # MinIO
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_PUBLIC_ENDPOINT: "http://minio:9000"
+  MINIO_REGION: "us-east-1"
+  MINIO_BUCKET_PATIENT: "patient-documents"
+  MINIO_BUCKET_DOCTOR: "doctor-docs"
+
+  # Resend email defaults
+  RESEND_FROM_EMAIL: "onboarding@resend.dev"
+  RESEND_FROM_NAME: "Smart Healthcare Platform"
+
+  # Service URLs (K8s service DNS)
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  APPOINTMENT_SERVICE_URL: "http://appointment-service:3004"
+  DOCTOR_SERVICE_URL: "http://doctor-service:3003"
+  DOCUMENT_SERVICE_URL: "http://document-service:3009"
+
+  # Telemedicine
+  TELEMEDICINE_DB_DSN: "postgres://telemedicine:telemedicine@postgres-telemedicine:5432/telemedicine_db?sslmode=disable"
+  SESSION_LINK_BASE_URL: "http://api-gateway:8080"
+  AGORA_TOKEN_TTL_SEC: "3600"
+  DEFAULT_SESSION_DURATION_SEC: "1800"
+  WARNING_THRESHOLD_SEC: "300"
+  NO_SHOW_THRESHOLD_SEC: "60"
+  RECONNECT_GRACE_SEC: "90"
+
+  # Cloud recording storage
+  RECORDING_STORAGE_VENDOR: "1"
+  RECORDING_STORAGE_REGION: "0"
+  RECORDING_STORAGE_BUCKET: ""
+  RECORDING_STORAGE_ENDPOINT: ""

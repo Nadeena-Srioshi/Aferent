@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: aferent
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: payment-service
+          image: ghcr.io/nathimn/aferent-payment-service:latest
+          ports:
+            - containerPort: 3005
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: MONGO_URI_PAYMENT_SERVICE
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: STRIPE_SECRET_KEY
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: aferent-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 3005
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: aferent
+spec:
+  selector:
+    app: payment-service
+  ports:
+    - port: 3005
+      targetPort: 3005
