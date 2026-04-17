@@ -57,7 +57,13 @@
                 class="w-full pl-10 pr-4 py-3.5 bg-white border border-border rounded-xl text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors appearance-none cursor-pointer"
               >
                 <option value="">Hospital</option>
-                <option v-for="option in hospitals" :key="option" :value="option">{{ option }}</option>
+                <option
+                  v-for="option in hospitals"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
               </select>
             </div>
 
@@ -106,9 +112,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Building2, CalendarDays, Search, Stethoscope, UserRound } from 'lucide-vue-next'
+import { getHospitals, getSpecializations } from '../../services/doctorService'
 
 const router = useRouter()
 const doctorName = ref('')
@@ -116,22 +123,63 @@ const selectedSpecialty = ref('')
 const hospital = ref('')
 const appointmentDate = ref('')
 const error = ref('')
+const specialties = ref([])
+const hospitals = ref([])
 
-const specialties = [
-  'Cardiology', 'Pediatrics', 'Mental Health', 'Dermatology',
-  'Neurology', 'Orthopedics', 'Gynecology', 'Endocrinology',
-]
+const quickFilters = computed(() => specialties.value.slice(0, 6))
 
-const hospitals = [
-  'Aferent Heart Institute',
-  'Aferent Wellness Center',
-  'Aferent Children\'s Hospital',
-  'SkinCare Medical Center',
-  'Aferent Women\'s Health Center',
-  'Aferent Orthopedic Clinic',
-]
+const toNameList = (items, fallbackKey = 'name') => {
+  if (!Array.isArray(items)) return []
 
-const quickFilters = ['Cardiology', 'Pediatrics', 'Mental Health', 'Dermatology', 'Gynecology', 'Orthopedics']
+  return items
+    .map((item) => {
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object') {
+        return item.name ?? item[fallbackKey] ?? null
+      }
+      return null
+    })
+    .filter(Boolean)
+}
+
+const toHospitalOptions = (items) => {
+  if (!Array.isArray(items)) return []
+
+  return items
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { value: item, label: item }
+      }
+
+      if (item && typeof item === 'object') {
+        const name = item.name ?? null
+        if (!name) return null
+
+        const city = item.city ? String(item.city).trim() : ''
+        return {
+          value: name,
+          label: city ? `${name} (${city})` : name,
+        }
+      }
+
+      return null
+    })
+    .filter(Boolean)
+}
+
+const loadReferenceData = async () => {
+  try {
+    const [specializationsResponse, hospitalsResponse] = await Promise.all([
+      getSpecializations(),
+      getHospitals(),
+    ])
+
+    specialties.value = toNameList(specializationsResponse)
+    hospitals.value = toHospitalOptions(hospitalsResponse)
+  } catch (e) {
+    error.value = e?.message || 'Failed to load hospitals and specializations.'
+  }
+}
 
 const handleSearch = () => {
   if (!selectedSpecialty.value) {
@@ -155,4 +203,8 @@ const applyQuickFilter = (tag) => {
   selectedSpecialty.value = tag
   handleSearch()
 }
+
+onMounted(() => {
+  loadReferenceData()
+})
 </script>
