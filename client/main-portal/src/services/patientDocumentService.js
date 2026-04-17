@@ -39,7 +39,7 @@ async function request(path, options = {}) {
 	return payload
 }
 
-function buildUploadInitQuery({ fileName, contentType, documentType, displayName }) {
+function buildUploadInitQuery({ fileName, contentType, documentType, documentSubType, displayName }) {
 	const params = new URLSearchParams()
 
 	if (!fileName) throw new Error('fileName is required')
@@ -49,6 +49,7 @@ function buildUploadInitQuery({ fileName, contentType, documentType, displayName
 	params.set('contentType', contentType)
 
 	if (documentType) params.set('documentType', documentType)
+	if (documentSubType) params.set('documentSubType', documentSubType)
 	if (displayName) params.set('displayName', displayName)
 
 	return params.toString()
@@ -64,6 +65,7 @@ export async function initializeDocumentUpload({
 	fileName,
 	contentType,
 	documentType,
+	documentSubType,
 	displayName,
 }) {
 	if (!token) throw new Error('token is required')
@@ -72,6 +74,7 @@ export async function initializeDocumentUpload({
 		fileName,
 		contentType,
 		documentType,
+		documentSubType,
 		displayName,
 	})
 

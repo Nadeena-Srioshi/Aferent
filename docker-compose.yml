@@ -178,6 +178,7 @@ services:
     container_name: nginx
     networks: [aferent-network]
     ports:
+      - "80:80"       # Unified entry-point — cloudflare tunnel target
       - "9000:9000"   # MinIO S3 API  — browser hits localhost:9000
       - "9001:9001"   # MinIO console — browser hits localhost:9001
     volumes:

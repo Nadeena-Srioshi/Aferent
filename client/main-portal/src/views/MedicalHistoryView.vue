@@ -5,16 +5,14 @@
       <!-- Header -->
       <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
         <div>
-          <h1 class="text-2xl font-bold text-ink mb-1">Medical Records</h1>
-          <p class="text-muted">Your health history, prescriptions, and lab results — all in one place.</p>
+          <h1 class="text-2xl font-bold text-ink mb-1">Medical History</h1>
+          <p class="text-muted">Your consultation timeline and prescriptions from completed visits.</p>
         </div>
-        <button
-          class="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-border text-ink font-semibold rounded-xl hover:border-primary hover:text-primary transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          @click="exportRecords"
-        >
-          <Download class="w-4 h-4" aria-hidden="true" />
-          Export PDF
-        </button>
+        <div class="text-xs text-muted">
+          <span class="inline-flex items-center px-2 py-1 rounded-md bg-surface border border-border">
+            Synced from your account
+          </span>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -34,40 +32,40 @@
         </button>
       </div>
 
+      <div v-if="isLoading" class="bg-card border border-border rounded-2xl p-8 text-center">
+        <p class="text-sm text-muted">Loading your medical history…</p>
+      </div>
+
+      <div v-else-if="loadError" class="bg-card border border-danger/30 rounded-2xl p-6">
+        <p class="text-sm text-danger font-semibold mb-1">Couldn’t load medical history</p>
+        <p class="text-xs text-muted mb-4">{{ loadError }}</p>
+        <button
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-semibold text-ink hover:text-primary hover:border-primary transition-colors"
+          @click="fetchMedicalHistory"
+        >
+          <RotateCw class="w-4 h-4" aria-hidden="true" />
+          Retry
+        </button>
+      </div>
+
       <!-- Records list -->
-      <!-- TODO: bind to recordsService — implement GET /records?type=activeTab -->
       <div role="tabpanel" :aria-label="currentTab?.label">
-        <div v-if="mockRecords[activeTab]?.length" class="space-y-3">
-          <div
-            v-for="record in mockRecords[activeTab]"
+        <div v-if="visibleItems.length" class="space-y-3">
+          <MedicalHistoryRecordCard
+            v-for="record in visibleItems"
             :key="record.id"
-            class="bg-card border border-border rounded-2xl p-5 flex items-start gap-4 hover:shadow-sm transition-shadow"
-          >
-            <!-- Icon -->
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" :class="record.iconBg" aria-hidden="true">
-              <component :is="record.icon" class="w-5 h-5" :class="record.iconColor" />
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <div class="flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                  <h3 class="font-semibold text-ink text-sm">{{ record.title }}</h3>
-                  <p class="text-xs text-muted mt-0.5">{{ record.doctor }} · {{ record.date }}</p>
-                </div>
-                <span class="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0" :class="record.statusClass">
-                  {{ record.status }}
-                </span>
-              </div>
-              <p v-if="record.notes" class="text-xs text-muted mt-2 leading-relaxed">{{ record.notes }}</p>
-            </div>
-
-            <button
-              class="flex-shrink-0 p-2 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              :aria-label="`Download ${record.title}`"
-            >
-              <FileDown class="w-4 h-4" aria-hidden="true" />
-            </button>
-          </div>
+            :type="record.type"
+            :title="record.title"
+            :subtitle="record.subtitle"
+            :description="record.description"
+            :meta-line="record.metaLine"
+            :status-label="record.status"
+            :action-label="record.actionLabel"
+            :action-aria-label="record.actionAriaLabel"
+            :action-loading="qrLoadingByPrescriptionId[record.prescriptionId] === true"
+            action-loading-label="Fetching QR…"
+            @action="handleCardAction(record)"
+          />
         </div>
 
         <!-- Empty state -->
@@ -77,7 +75,7 @@
               <FileText class="w-8 h-8 text-muted" aria-hidden="true" />
             </div>
             <h3 class="font-semibold text-ink mb-1">No {{ currentTab?.label.toLowerCase() }} yet</h3>
-            <p class="text-sm text-muted">Records from your consultations will appear here.</p>
+            <p class="text-sm text-muted">Your data will appear after consultations and prescription issuance.</p>
           </div>
         </div>
       </div>
@@ -87,38 +85,151 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-// TODO: import recordsService from '@/services/recordsService'
-import { Download, FileDown, FileText, HeartPulse, UserRound } from 'lucide-vue-next'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { FileText, RotateCw } from 'lucide-vue-next'
+import { useAuth } from '@/stores/useAuth'
+import { useNotificationStore } from '@/stores/notificationStore'
+import medicalHistoryService from '@/services/medicalHistoryService'
+import MedicalHistoryRecordCard from '@/components/shared/MedicalHistoryRecordCard.vue'
 
 const activeTab = ref('visits')
+const isLoading = ref(false)
+const loadError = ref('')
+const records = ref([])
+const currentPatientId = ref('')
+
+const authStore = useAuth()
+const notificationStore = useNotificationStore()
+const qrLoadingByPrescriptionId = reactive({})
 
 const tabs = [
-  { key: 'visits',        label: 'Visit Summaries' },
+  { key: 'visits', label: 'Visit Summaries' },
   { key: 'prescriptions', label: 'Prescriptions' },
-  { key: 'labs',          label: 'Lab Results' },
-  { key: 'imaging',       label: 'Imaging' },
-  { key: 'referrals',     label: 'Referrals' },
 ]
 
 const currentTab = computed(() => tabs.find(t => t.key === activeTab.value))
 
-// ── Mock data — replace with API data ──────────────────────────
-const mockRecords = {
-  visits: [
-    { id: 1, title: 'General Checkup',         doctor: 'Dr. Sarah Mitchell', date: '14 Mar 2026', status: 'Completed', statusClass: 'bg-success/10 text-success', notes: 'Blood pressure slightly elevated. Monitor for 2 weeks. Follow-up booked.',        icon: UserRound, iconBg: 'bg-primary/10', iconColor: 'text-primary' },
-    { id: 2, title: 'Mental Health Consultation', doctor: 'Dr. Riya Patel', date: '2 Feb 2026',   status: 'Completed', statusClass: 'bg-success/10 text-success', notes: 'Discussed sleep patterns. CBT exercises recommended.',                        icon: HeartPulse, iconBg: 'bg-ai/10', iconColor: 'text-ai' },
-  ],
-  prescriptions: [
-    { id: 3, title: 'Amlodipine 5mg',           doctor: 'Dr. Sarah Mitchell', date: '14 Mar 2026', status: 'Active',    statusClass: 'bg-warning/10 text-warning', notes: 'Once daily. Take in the morning. 30-day supply with 2 refills.',              icon: FileText, iconBg: 'bg-warning/10', iconColor: 'text-warning' },
-  ],
-  labs: [],
-  imaging: [],
-  referrals: [],
+function formatDate(value) {
+  if (!value) return 'Unknown date'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
-function exportRecords() {
-  // TODO: call recordsService.exportPdf(activeTab.value)
-  console.log('Export PDF — wire to recordsService')
+function toUiRecord(record, index) {
+  const doctorName = record?.doctorName || 'Doctor'
+  const issuedDate = formatDate(record?.issuedAt || record?.recordedAt)
+  const prescriptionId = record?.prescriptionId || `rx-${index}`
+  const diagnosis = record?.diagnosis || 'Consultation note'
+
+  return {
+    id: `${prescriptionId}-${index}`,
+    prescriptionId,
+    type: 'visit',
+    title: diagnosis,
+    subtitle: `${doctorName} · ${issuedDate}`,
+    description: record?.notes || '',
+    status: 'Completed',
+    metaLine: record?.consultationType ? `Consultation: ${record.consultationType}` : '',
+    isPrescription: false,
+  }
 }
+
+function toUiPrescription(record, index) {
+  const doctorName = record?.doctorName || 'Doctor'
+  const issuedDate = formatDate(record?.issuedAt || record?.recordedAt)
+  const prescriptionId = record?.prescriptionId || `rx-${index}`
+  const medications = Array.isArray(record?.medications) ? record.medications : []
+  const firstMedication = medications[0]?.name || medications[0]?.medication || null
+
+  return {
+    id: `${prescriptionId}-${index}`,
+    prescriptionId,
+    type: 'prescription',
+    title: firstMedication ? `Prescription: ${firstMedication}` : `Prescription #${prescriptionId}`,
+    subtitle: `${doctorName} · ${issuedDate}`,
+    description: record?.notes || '',
+    status: 'Issued',
+    metaLine: record?.followUpDate ? `Follow-up: ${record.followUpDate}` : '',
+    actionLabel: 'Get QR',
+    actionAriaLabel: `Get QR code for prescription ${prescriptionId}`,
+    isPrescription: true,
+  }
+}
+
+const visitItems = computed(() => records.value.map(toUiRecord))
+const prescriptionItems = computed(() => records.value.map(toUiPrescription))
+
+const visibleItems = computed(() => {
+  if (activeTab.value === 'prescriptions') return prescriptionItems.value
+  return visitItems.value
+})
+
+async function fetchMedicalHistory() {
+  isLoading.value = true
+  loadError.value = ''
+
+  try {
+    const token = authStore.token
+    if (!token) {
+      throw new Error('You must be logged in to view medical history')
+    }
+
+    const history = await medicalHistoryService.getMyMedicalHistory({ token })
+    currentPatientId.value = history?.patientId || ''
+    records.value = Array.isArray(history?.records) ? history.records : []
+  } catch (error) {
+    const message = error?.message || 'Failed to load medical history'
+    loadError.value = message
+    notificationStore.push(message, 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function requestQrSignedUrl(prescriptionId) {
+  const token = authStore.token
+  const authId = authStore.user?.authId || ''
+  const role = authStore.user?.role || ''
+
+  if (!token) {
+    notificationStore.push('You must be logged in to fetch QR links', 'warning')
+    return
+  }
+
+  if (!authId || !role) {
+    notificationStore.push('Missing auth context. Please login again.', 'warning')
+    return
+  }
+
+  qrLoadingByPrescriptionId[prescriptionId] = true
+  try {
+    const { signedUrl } = await medicalHistoryService.getPrescriptionQrSignedUrl({
+      token,
+      prescriptionId,
+      authId,
+      role,
+      patientId: currentPatientId.value || undefined,
+    })
+
+    window.open(signedUrl, '_blank', 'noopener,noreferrer')
+  } catch (error) {
+    notificationStore.push(error?.message || 'Could not fetch QR signed URL', 'error')
+  } finally {
+    qrLoadingByPrescriptionId[prescriptionId] = false
+  }
+}
+
+function handleCardAction(record) {
+  if (!record?.isPrescription || !record?.prescriptionId) return
+  requestQrSignedUrl(record.prescriptionId)
+}
+
+onMounted(() => {
+  fetchMedicalHistory()
+})
 </script>

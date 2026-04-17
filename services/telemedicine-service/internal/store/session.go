@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/aferent/telemedicine-service/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,7 +35,7 @@ func (s *SessionStore) EnsureSession(ctx context.Context, appointmentID string, 
 	if err == nil {
 		return row, nil
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 

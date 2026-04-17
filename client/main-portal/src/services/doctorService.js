@@ -152,6 +152,12 @@ export async function uploadFileToPresignedUrl({ uploadUrl, file }) {
 	}
 
 	return true
+
+}
+export async function getDoctorById(doctorId) {
+	if (!doctorId) throw new Error('doctorId is required')
+
+	return request(`/doctors/${encodeURIComponent(doctorId)}`)
 }
 
 export default {
@@ -172,4 +178,6 @@ export default {
 	addScheduleOverride,
 	deleteScheduleOverride,
 	uploadFileToPresignedUrl,
+	confirmLicenseUpload,
+	getDoctorById
 }

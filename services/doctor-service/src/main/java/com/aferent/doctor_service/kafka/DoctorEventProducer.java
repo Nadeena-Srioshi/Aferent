@@ -91,10 +91,12 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -270,13 +272,14 @@ public class DoctorEventProducer {
         payload.put("patientEmail", prescription.getPatientEmail());
 
         payload.put("diagnosis", prescription.getDiagnosis());
-        payload.put("symptoms", prescription.getSymptoms());
+        payload.put("symptoms", normalizeSymptoms(prescription.getSymptoms()));
+        payload.put("symptomsText", prescription.getSymptoms());
         payload.put("medications", prescription.getMedications());
         payload.put("notes", prescription.getNotes());
-        payload.put("followUpDate", prescription.getFollowUpDate());
+        payload.put("followUpDate", prescription.getFollowUpDate() != null ? prescription.getFollowUpDate().toString() : null);
 
         payload.put("qrCodeKey", prescription.getQrCodeKey());
-        payload.put("issuedAt", prescription.getIssuedAt());
+        payload.put("issuedAt", prescription.getIssuedAt() != null ? prescription.getIssuedAt().toString() : null);
 
         String key = (prescription.getPatientId() != null && !prescription.getPatientId().isBlank())
                 ? prescription.getPatientId()
@@ -287,5 +290,16 @@ public class DoctorEventProducer {
                 prescriptionIssuedTopic,
                 prescription.getPrescriptionId(),
                 prescription.getPatientId());
+    }
+
+    private List<String> normalizeSymptoms(String symptoms) {
+        if (symptoms == null || symptoms.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        return Arrays.stream(symptoms.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toList());
     }
 }

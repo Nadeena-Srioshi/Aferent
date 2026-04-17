@@ -10,7 +10,11 @@ spring:
         add-to-simple-url-handler-mapping: true
         cors-configurations:
           '[/**]':
-            allowedOrigins: "${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4000}"
+            allowedOriginPatterns:
+              - "https://*.trycloudflare.com"
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+              - "${CORS_EXTRA_ORIGIN:http://localhost:5173}"
             allowedMethods:
               - GET
               - POST
@@ -53,6 +57,12 @@ spring:
           uri: http://appointment-service:3004
           predicates:
             - Path=/appointments/**
+
+        # APPOINTMENT SERVICE — debug endpoints (keep behind auth or remove in prod)
+        - id: appointment-service-debug
+          uri: http://appointment-service:3004
+          predicates:
+            - Path=/debug/**
 
         # PAYMENT SERVICE
         - id: payment-service
@@ -97,6 +107,7 @@ app:
     - /specializations/**
     - /doctors/**
     - /sessions/webhooks  # agora callback endpoint — uses webhook signature, not JWT
+    - /debug/**           # debug endpoints — remove or restrict in production
 
 logging:
   pattern:
