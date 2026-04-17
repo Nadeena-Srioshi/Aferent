@@ -49,11 +49,11 @@ const router = createRouter({
           name: 'payments',
           component: () => import('@/views/PaymentsView.vue'),
         },
-        // {
-        //   path: 'notifications',
-        //   name: 'notifications',
-        //   component: () => import('@/views/NotificationsView.vue'),
-        // },
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/NotificationsView.vue'),
+        },
       ],
     },
 
