@@ -97,6 +97,44 @@ export async function getLicenseSignedUrl({ token, doctorId, expires = 3600 }) {
 	})
 }
 
+export async function getWeeklySchedule({ doctorId }) {
+	return request(`/doctors/${doctorId}/schedule/weekly`)
+}
+
+export async function setWeeklySchedule({ token, doctorId, payload }) {
+	return request(`/doctors/${doctorId}/schedule/weekly`, {
+		method: 'PUT',
+		headers: authHeaders(token),
+		body: JSON.stringify(payload),
+	})
+}
+
+export async function deleteWeeklySchedule({ token, doctorId }) {
+	return request(`/doctors/${doctorId}/schedule/weekly`, {
+		method: 'DELETE',
+		headers: authHeaders(token),
+	})
+}
+
+export async function getScheduleOverrides({ doctorId }) {
+	return request(`/doctors/${doctorId}/schedule/overrides`)
+}
+
+export async function addScheduleOverride({ token, doctorId, payload }) {
+	return request(`/doctors/${doctorId}/schedule/overrides`, {
+		method: 'POST',
+		headers: authHeaders(token),
+		body: JSON.stringify(payload),
+	})
+}
+
+export async function deleteScheduleOverride({ token, doctorId, overrideId }) {
+	return request(`/doctors/${doctorId}/schedule/overrides/${overrideId}`, {
+		method: 'DELETE',
+		headers: authHeaders(token),
+	})
+}
+
 export async function uploadFileToPresignedUrl({ uploadUrl, file }) {
 	const headers = file?.type ? { 'Content-Type': file.type } : undefined
 	const response = await fetch(uploadUrl, {
@@ -127,5 +165,11 @@ export default {
 	getProfilePicUploadUrl,
 	getProfilePicUrl,
 	getLicenseSignedUrl,
+	getWeeklySchedule,
+	setWeeklySchedule,
+	deleteWeeklySchedule,
+	getScheduleOverrides,
+	addScheduleOverride,
+	deleteScheduleOverride,
 	uploadFileToPresignedUrl,
 }

@@ -73,6 +73,13 @@
 
 							<div class="flex flex-wrap gap-2 lg:justify-end">
 								<RouterLink
+									to="/doctor/schedule"
+									class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-white/80 backdrop-blur text-sm font-semibold text-ink hover:border-primary/40 hover:text-primary transition-colors"
+								>
+									<CalendarDays class="w-4 h-4" />
+									Availability
+								</RouterLink>
+								<RouterLink
 									to="/doctor/dashboard"
 									class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-white/80 backdrop-blur text-sm font-semibold text-ink hover:border-primary/40 hover:text-primary transition-colors"
 								>
@@ -324,7 +331,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { AlertCircle, ArrowLeft, Camera, CheckCircle, FileText, Shield, User, Stethoscope, Building2, Languages, Award } from 'lucide-vue-next'
+import { AlertCircle, ArrowLeft, CalendarDays, Camera, CheckCircle, FileText, Shield, User, Stethoscope, Building2, Languages, Award } from 'lucide-vue-next'
 import { useAuth } from '@/stores/useAuth'
 import { useNotificationStore } from '@/stores/notificationStore'
 import doctorService from '@/services/doctorService'

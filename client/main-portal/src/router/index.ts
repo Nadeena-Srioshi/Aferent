@@ -12,6 +12,7 @@ import MedicalHistoryView from '@/views/MedicalHistoryView.vue'
 import DoctorRegisterView from '@/views/DoctorRegisterView.vue'
 import DoctorDashboardView from '@/views/DoctorDashboardView.vue'
 import DoctorProfileView from '@/views/DoctorProfileView.vue'
+import DoctorScheduleView from '@/views/DoctorScheduleView.vue'
 import { useAuth } from '@/stores/useAuth'
 
 function normalizeRole(role: unknown) {
@@ -41,6 +42,12 @@ const router = createRouter({
       path: '/doctor/dashboard',
       name: 'doctor-dashboard',
       component: DoctorDashboardView,
+      meta: { requiresAuth: true, roles: ['DOCTOR'] },
+    },
+    {
+      path: '/doctor/schedule',
+      name: 'doctor-schedule',
+      component: DoctorScheduleView,
       meta: { requiresAuth: true, roles: ['DOCTOR'] },
     },
   ],

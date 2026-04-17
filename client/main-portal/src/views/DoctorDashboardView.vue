@@ -14,6 +14,13 @@
 				</div>
 				<div class="flex flex-wrap gap-2">
 					<RouterLink
+						to="/doctor/schedule"
+						class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-semibold text-ink hover:border-primary/40 hover:text-primary transition-colors"
+					>
+						<Clock3 class="w-4 h-4" aria-hidden="true" />
+						Manage Availability
+					</RouterLink>
+					<RouterLink
 						to="/doctor/profile"
 						class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-semibold text-ink hover:border-primary/40 hover:text-primary transition-colors"
 					>
@@ -155,7 +162,7 @@
 						>
 							<p class="text-xs font-semibold text-muted uppercase">{{ day.label }}</p>
 							<p class="text-lg font-bold text-ink mt-1">{{ day.slots }}</p>
-							<p class="text-xs text-muted">slots</p>
+							<p class="text-xs text-muted">{{ day.slots === 1 ? 'session' : 'sessions' }}</p>
 						</div>
 					</div>
 				</article>
