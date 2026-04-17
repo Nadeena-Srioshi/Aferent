@@ -3,3 +3,4 @@ logs/
 **/.idea/
 local/
 docker-compose.override.yml
+**/.vite/
