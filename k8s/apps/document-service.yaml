@@ -15,6 +15,8 @@ spec:
       labels:
         app: document-service
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: document-service
           image: ghcr.io/nathimn/aferent-document-service:latest
@@ -24,15 +26,9 @@ spec:
             - name: SERVER_PORT
               value: "3009"
             - name: MINIO_ENDPOINT
-              valueFrom:
-                configMapKeyRef:
-                  name: aferent-config
-                  key: MINIO_ENDPOINT
+              value: "minio:9000"
             - name: MINIO_PUBLIC_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: aferent-config
-                  key: MINIO_PUBLIC_ENDPOINT
+              value: "minio:9000"
             - name: MINIO_ACCESS_KEY
               valueFrom:
                 secretKeyRef:

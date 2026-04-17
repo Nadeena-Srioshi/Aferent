@@ -15,6 +15,8 @@ spec:
       labels:
         app: symptom-detector
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: symptom-detector
           image: ghcr.io/nathimn/aferent-symptom-detector:latest
