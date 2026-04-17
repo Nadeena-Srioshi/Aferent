@@ -104,7 +104,7 @@
 					</div>
 				</section>
 
-				<section class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+				<section class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
 					<article class="xl:col-span-8 bg-card rounded-[28px] border border-border p-5 sm:p-6 shadow-sm">
 						<div class="flex items-center justify-between mb-5">
 							<div>
@@ -242,7 +242,13 @@
 						</div>
 					</article>
 
-					<aside class="xl:col-span-4 space-y-5">
+					<aside class="xl:col-span-4 space-y-5 xl:sticky xl:top-24">
+						<article class="bg-card rounded-[28px] border border-border p-5 sm:p-6 shadow-sm">
+							<p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary mb-2">About</p>
+							<p v-if="doctor.bio" class="text-sm text-ink/90 leading-relaxed whitespace-pre-line">{{ doctor.bio }}</p>
+							<p v-else class="text-sm text-muted leading-relaxed">No bio added yet. Add your professional summary in the editable form to help patients understand your expertise.</p>
+						</article>
+
 						<article class="bg-card rounded-[28px] border border-border p-5 sm:p-6 shadow-sm">
 							<h2 class="text-lg font-semibold text-ink mb-4">Overview</h2>
 							<div class="space-y-4">
