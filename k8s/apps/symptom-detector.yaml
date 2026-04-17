@@ -28,6 +28,21 @@ spec:
                 secretKeyRef:
                   name: aferent-secrets
                   key: MONGO_URI_SYMPTOM_SERVICE
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: GEMINI_API_KEY
+            - name: GEMINI_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: GEMINI_MODEL
+            - name: GEMINI_TIMEOUT_SECONDS
+              valueFrom:
+                secretKeyRef:
+                  name: aferent-secrets
+                  key: GEMINI_TIMEOUT_SECONDS
           readinessProbe:
             httpGet:
               path: /ai/api/v1/health

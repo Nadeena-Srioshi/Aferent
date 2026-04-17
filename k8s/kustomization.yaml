@@ -21,8 +21,12 @@ resources:
   - infra/minio.yaml
   - infra/minio-init-job.yaml
 
-  # Nginx ingress / reverse proxy
-  - ingress/nginx.yaml
+  # Nginx reverse proxy (legacy — use ingress-native/ instead with minikube addons enable ingress)
+  # - ingress/nginx.yaml
+
+  # K8s Ingress + MinIO proxy (requires: minikube addons enable ingress)
+  - ingress-native/ingress.yaml
+  - ingress-native/minio-proxy.yaml
 
   # Application services
   - apps/auth-service.yaml
