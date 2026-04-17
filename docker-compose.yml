@@ -275,11 +275,6 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI_DOCTOR_SERVICE}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET_DOCTOR}
       PRESCRIPTION_BASE_URL: http://localhost:8080
       DOCUMENT_SERVICE_URL: http://document-service:3009
       DOCUMENT_SERVICE_ID: doctor-service
