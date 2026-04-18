@@ -35,6 +35,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
+      start_period: 30s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -55,10 +56,14 @@ services:
     container_name: auth-service
     networks: [aferent-network]
     ports:
-      - "3001:3001"   # exposed for direct testing — remove in production
+      - "3001:3001"
+    depends_on:
+      kafka:
+        condition: service_healthy
     environment:
       MONGO_URI: ${MONGO_URI_AUTH_SERVICE}
       JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092 
     volumes:
       - ./logs/auth-service:/app/logs
     healthcheck:
@@ -66,6 +71,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 60s 
 
   api-gateway:
     build:
@@ -76,7 +82,7 @@ services:
       - "8080:8080"
     depends_on:
       auth-service:
-        condition: service_healthy
+        condition: service_started
     environment:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: http://auth-service:3001
