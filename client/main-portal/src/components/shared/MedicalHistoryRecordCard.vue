@@ -18,6 +18,34 @@
       <p v-if="description" class="text-xs text-muted mt-2 leading-relaxed">{{ description }}</p>
 
       <div v-if="metaLine" class="mt-2 text-[11px] text-muted">{{ metaLine }}</div>
+
+      <div v-if="symptoms?.length" class="mt-3">
+        <p class="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">Symptoms</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="symptom in symptoms"
+            :key="symptom"
+            class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] bg-surface border border-border text-ink"
+          >
+            {{ symptom }}
+          </span>
+        </div>
+      </div>
+
+      <div v-if="medications?.length" class="mt-3">
+        <p class="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">Prescription</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="medication in medications"
+            :key="medication"
+            class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] bg-warning/10 border border-warning/20 text-warning"
+          >
+            {{ medication }}
+          </span>
+        </div>
+      </div>
+
+      <div v-if="followUpLine" class="mt-2 text-[11px] text-muted">{{ followUpLine }}</div>
     </div>
 
     <button
@@ -38,12 +66,15 @@ import { computed } from 'vue'
 import { HeartPulse, ReceiptText, FileDown } from 'lucide-vue-next'
 
 const props = defineProps({
-  type: { type: String, default: 'visit' },
   title: { type: String, required: true },
   subtitle: { type: String, required: true },
   description: { type: String, default: '' },
   statusLabel: { type: String, default: 'Recorded' },
   metaLine: { type: String, default: '' },
+  prescriptionId: { type: String, default: '' },
+  medications: { type: Array, default: () => [] },
+  symptoms: { type: Array, default: () => [] },
+  followUpLine: { type: String, default: '' },
   actionLabel: { type: String, default: '' },
   actionAriaLabel: { type: String, default: '' },
   actionLoading: { type: Boolean, default: false },
@@ -52,14 +83,14 @@ const props = defineProps({
 
 defineEmits(['action'])
 
-const icon = computed(() => (props.type === 'prescription' ? ReceiptText : HeartPulse))
+const icon = computed(() => (props.prescriptionId ? ReceiptText : HeartPulse))
 const actionIcon = computed(() => FileDown)
 
-const iconBg = computed(() => (props.type === 'prescription' ? 'bg-warning/10' : 'bg-primary/10'))
-const iconColor = computed(() => (props.type === 'prescription' ? 'text-warning' : 'text-primary'))
+const iconBg = computed(() => (props.prescriptionId ? 'bg-warning/10' : 'bg-primary/10'))
+const iconColor = computed(() => (props.prescriptionId ? 'text-warning' : 'text-primary'))
 
 const statusClass = computed(() => {
-  if (props.type === 'prescription') return 'bg-warning/10 text-warning'
+  if (props.prescriptionId) return 'bg-warning/10 text-warning'
   return 'bg-success/10 text-success'
 })
 </script>

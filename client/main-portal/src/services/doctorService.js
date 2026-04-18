@@ -48,9 +48,12 @@ export async function getHospitals() {
 	return request('/hospitals')
 }
 
-export async function getMyHospitals({ token }) {
+export async function getMyHospitals({ token, authId }) {
 	return request('/doctors/me/hospitals', {
-		headers: authHeaders(token),
+		headers: {
+			...authHeaders(token),
+			...(authId ? { 'X-User-ID': authId } : {}),
+		},
 	})
 }
 

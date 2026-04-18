@@ -248,6 +248,11 @@ Notes:
 
 Returns `AppointmentResponse`.
 
+**Status logic after booking**:
+- **PHYSICAL** with `consultationFee > 0`: status = `PENDING_PAYMENT`
+- **PHYSICAL** with `consultationFee = 0`: status = `CONFIRMED` (no payment needed)
+- **VIDEO**: status = `PENDING_DOCTOR_APPROVAL` (doctor accepts/rejects, then payment)
+
 ### Typical errors
 - `400` validation error (missing required fields)
 - `400` for VIDEO without `videoSlotId`

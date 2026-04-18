@@ -234,10 +234,12 @@ function formatFee(fee?: number) {
               <td class="td-name">{{ spec.name }}</td>
               <td class="td-fee">{{ formatFee(spec.maxVideoConsultationFee) }}</td>
               <td class="td-fee">{{ formatFee(spec.maxPhysicalConsultationFee) }}</td>
-              <td class="td-date">{{ spec.createdAt ? formatDate(spec.createdAt) : '—' }}</td>
+              <td class="td-date">{{ spec.createdAt ? formatDate(spec.createdAt) : spec.updatedAt ? formatDate(spec.updatedAt) : '—' }}</td>
               <td class="td-action">
-                <button @click="openEditModal(spec)" class="action-btn edit-btn">Edit</button>
-                <button @click="openDeleteModal(spec)" class="action-btn delete-btn">Delete</button>
+                <div class="action-group">
+                  <button @click="openEditModal(spec)" class="action-btn edit-btn">Edit</button>
+                  <button @click="openDeleteModal(spec)" class="action-btn delete-btn">Delete</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -516,6 +518,14 @@ td {
   text-align: right;
 }
 
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+
 .action-btn {
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
@@ -525,7 +535,8 @@ td {
   padding: 5px 12px;
   cursor: pointer;
   transition: background 0.15s;
-  margin-left: 6px;
+  margin-left: 0;
+  white-space: nowrap;
 }
 .edit-btn {
   color: #4a9eff;

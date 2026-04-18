@@ -129,6 +129,9 @@ public class AppointmentService {
         slotRepository.save(slot);
         
 
+        double fee = slot.getConsultationFee() != null ? slot.getConsultationFee() : 0.0;
+        AppointmentStatus status = fee > 0 ? AppointmentStatus.PENDING_PAYMENT : AppointmentStatus.CONFIRMED;
+
         return Appointment.builder()
                 .patientId(patientId)
                 .patientEmail(patientEmail)
@@ -139,13 +142,13 @@ public class AppointmentService {
                 .scheduleId(request.getScheduleId())
                 .generatedSlotId(slot.getId())
                 .type(AppointmentType.PHYSICAL)
-                .status(AppointmentStatus.PENDING_PAYMENT)
+                .status(status)
                 .appointmentDate(date)
                 .appointmentNumber(slot.getAppointmentNumber())
                 .calculatedTime(slot.getStartTime())
                 .hospitalName(slot.getHospitalName())
                 .hospitalLocation(slot.getHospitalLocation())
-                .consultationFee(slot.getConsultationFee())
+                .consultationFee(fee)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();

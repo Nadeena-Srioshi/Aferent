@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -65,6 +66,8 @@ public class ReferenceDataService {
                         .name(spec.getName())
                         .maxVideoConsultationFee(includeFees ? spec.getMaxVideoConsultationFee() : null)
                         .maxPhysicalConsultationFee(includeFees ? spec.getMaxPhysicalConsultationFee() : null)
+                .createdAt(spec.getCreatedAt())
+                .updatedAt(spec.getUpdatedAt())
                         .build())
                 .toList();
     }
@@ -75,6 +78,8 @@ public class ReferenceDataService {
                 .maxVideoConsultationFee(request.getMaxVideoConsultationFee())
                 .maxPhysicalConsultationFee(request.getMaxPhysicalConsultationFee())
                 .active(true)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
                 .build();
         Specialization saved = specializationRepository.save(spec);
         log.info("Specialization added: {}", saved.getName());
@@ -89,6 +94,7 @@ public class ReferenceDataService {
         spec.setMaxVideoConsultationFee(request.getMaxVideoConsultationFee());
         spec.setMaxPhysicalConsultationFee(request.getMaxPhysicalConsultationFee());
         spec.setActive(request.isActive());
+        spec.setUpdatedAt(LocalDateTime.now());
         return specializationRepository.save(spec);
     }
 

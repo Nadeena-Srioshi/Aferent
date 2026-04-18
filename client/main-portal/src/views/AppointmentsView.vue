@@ -66,20 +66,31 @@
               <template #actions>
                 <button
                   v-if="canJoinVideoCall(appointment)"
-                  class="flex-1 py-2 text-xs font-semibold text-white bg-ai rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                  class="flex-1 py-2 text-xs font-semibold text-white rounded-xl transition-colors disabled:opacity-60 relative"
+                  :class="shouldShowJoinNowIndicator(appointment)
+                    ? 'bg-green-500 hover:bg-green-600 animate-pulse'
+                    : 'bg-ai hover:opacity-90'
+                  "
+                  :disabled="joiningSession[appointment.id]"
                   @click="joinVideoCall(appointment)"
                 >
-                  Join Video Call
+                  <span v-if="shouldShowJoinNowIndicator(appointment)" class="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                  {{ joiningSession[appointment.id] ? 'Joining…' : shouldShowJoinNowIndicator(appointment) ? 'Join Now' : 'Join Video Call' }}
                 </button>
 
-                <button
-                  v-if="canInitiatePayment(appointment)"
-                  class="flex-1 py-2 text-xs font-semibold text-white bg-primary rounded-xl hover:bg-action transition-colors disabled:opacity-60"
-                  :disabled="actionLoadingId === appointment.id"
-                  @click="startPayment(appointment)"
-                >
-                  {{ actionLoadingId === appointment.id ? 'Processing...' : 'Pay now' }}
-                </button>
+                <template v-if="canInitiatePayment(appointment)">
+                  <div class="flex-1 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-xs text-center">
+                    <p class="text-muted">Amount due</p>
+                    <p class="font-bold text-primary">{{ formatMoney(getAppointmentFee(appointment)) }}</p>
+                  </div>
+                  <button
+                    class="flex-1 py-2 text-xs font-semibold text-white bg-primary rounded-xl hover:bg-action transition-colors disabled:opacity-60"
+                    :disabled="actionLoadingId === appointment.id"
+                    @click="startPayment(appointment)"
+                  >
+                    {{ actionLoadingId === appointment.id ? 'Processing...' : 'Pay now' }}
+                  </button>
+                </template>
 
                 <button
                   v-if="canCancel(appointment)"
@@ -128,7 +139,6 @@
             </Appointmentcard>
 
             <div class="px-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-              <span>ID: {{ appointment.id }}</span>
               <span>Status: {{ humanizeAppointmentStatus(appointment.status) }}</span>
               <span v-if="appointment.paymentId">Payment ID: {{ appointment.paymentId }}</span>
               <span v-if="appointment.videoSessionLink" class="text-ai">
@@ -208,6 +218,7 @@ import {
   updateAppointmentStatus,
 } from '@/services/appointmentService'
 import { getPaymentByAppointment, initiatePayment, listPayments } from '@/services/paymentService'
+import { getSessionStatus } from '@/services/telemedicineService'
 
 const auth = useAuth()
 const notify = useNotificationStore()
@@ -224,6 +235,7 @@ const payments = ref([])
 
 const cancelDialogOpen = ref(false)
 const appointmentToCancel = ref(null)
+const joiningSession = ref({})
 
 const isDoctor = computed(() => auth.isDoctor)
 const isPatient = computed(() => auth.isPatient)
@@ -363,11 +375,11 @@ function formatDateTime(value) {
   }).format(date)
 }
 
-function formatMoney(amount, currency = 'USD') {
+function formatMoney(amount, currency = 'LKR') {
   const safeAmount = Number(amount || 0)
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: String(currency || 'USD').toUpperCase(),
+    currency: String(currency || 'LKR').toUpperCase(),
     minimumFractionDigits: 2,
   }).format(Number.isFinite(safeAmount) ? safeAmount : 0)
 }
@@ -375,6 +387,8 @@ function formatMoney(amount, currency = 'USD') {
 function canInitiatePayment(appointment) {
   if (!isPatient.value) return false
   const status = String(appointment?.status || '').toUpperCase()
+  const fee = getAppointmentFee(appointment)
+  if (!Number.isFinite(fee) || fee <= 0) return false
   return ['PENDING_PAYMENT', 'ACCEPTED_PENDING_PAYMENT', 'PAYMENT_FAILED'].includes(status)
 }
 
@@ -394,10 +408,39 @@ function canDoctorComplete(appointment) {
   return String(appointment?.status || '').toUpperCase() === 'CONFIRMED'
 }
 
+function getAppointmentTime(appointment) {
+  const date = appointment?.appointmentDate
+  const time = appointment?.videoSlotStart || appointment?.calculatedTime || '00:00'
+  if (!date) return null
+  const iso = `${date}T${String(time).slice(0, 5)}:00`
+  const result = new Date(iso)
+  return Number.isNaN(result.getTime()) ? null : result
+}
+
+function isJoinableTime(appointment) {
+  const appTime = getAppointmentTime(appointment)
+  if (!appTime) return false
+  const now = new Date()
+  const minutesBefore = 5
+  const startWindow = new Date(appTime.getTime() - minutesBefore * 60000)
+  const endWindow = new Date(appTime.getTime() + 60 * 60000)
+  return now >= startWindow && now <= endWindow
+}
+
 function canJoinVideoCall(appointment) {
   const status = String(appointment?.status || '').toUpperCase()
   const type = String(appointment?.type || '').toUpperCase()
-  return type === 'VIDEO' && status === 'CONFIRMED'
+  return type === 'VIDEO' && status === 'CONFIRMED' && isJoinableTime(appointment)
+}
+
+function shouldShowJoinNowIndicator(appointment) {
+  const appTime = getAppointmentTime(appointment)
+  if (!appTime) return false
+  const now = new Date()
+  const minutesBefore = 10
+  const startWindow = new Date(appTime.getTime() - minutesBefore * 60000)
+  const appStartTime = new Date(appTime.getTime())
+  return now >= startWindow && now <= appStartTime && canJoinVideoCall(appointment)
 }
 
 function getAppointmentFee(appointment) {
@@ -414,9 +457,24 @@ function getAppointmentFee(appointment) {
   return Number.isFinite(fallback) ? fallback : 0
 }
 
-function joinVideoCall(appointment) {
+async function joinVideoCall(appointment) {
   if (!appointment?.id) return
-  router.push({ name: 'video-call', params: { appointmentId: appointment.id } })
+  
+  joiningSession.value[appointment.id] = true
+  try {
+    await getSessionStatus({
+      token: auth.token,
+      userId: userId.value,
+      userEmail: userEmail.value,
+      role: currentRole.value,
+      appointmentId: appointment.id,
+    })
+    router.push({ name: 'video-call', params: { appointmentId: appointment.id } })
+  } catch (err) {
+    notify.push(err?.message || 'Unable to join video session.', 'error')
+  } finally {
+    joiningSession.value[appointment.id] = false
+  }
 }
 
 async function loadPageData() {
