@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AppointmentService {
 
+    private static final int DOCTOR_SLOT_FUTURE_WINDOW_DAYS = 21;
+
     private final AppointmentRepository     appointmentRepository;
     private final GeneratedSlotRepository   slotRepository;
     private final KafkaProducer             kafkaProducer;
@@ -48,6 +50,7 @@ public class AppointmentService {
             : null;
 
         LocalDate today = LocalDate.now();
+        LocalDate maxFutureDate = today.plusDays(DOCTOR_SLOT_FUTURE_WINDOW_DAYS);
 
         List<GeneratedSlot> slots = (selectedDate != null)
             ? slotRepository.findByDoctorIdAndDate(doctorId, selectedDate)
@@ -56,11 +59,12 @@ public class AppointmentService {
         return slots
                 .stream()
                 .filter(s -> !s.isBooked())
-            .filter(s -> type == null || s.getType() == type)
-            .filter(s -> selectedDate != null || !s.getDate().isBefore(today))
-            .sorted(Comparator
-                .comparing(GeneratedSlot::getDate)
-                .thenComparing(GeneratedSlot::getStartTime))
+                .filter(s -> type == null || s.getType() == type)
+                .filter(s -> !s.getDate().isBefore(today))
+                .filter(s -> !s.getDate().isAfter(maxFutureDate))
+                .sorted(Comparator
+                        .comparing(GeneratedSlot::getDate)
+                        .thenComparing(GeneratedSlot::getStartTime))
                 .map(this::toSlotResponse)
                 .collect(Collectors.toList());
     }

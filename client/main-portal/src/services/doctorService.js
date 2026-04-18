@@ -37,17 +37,27 @@ async function request(path, options = {}) {
 	return payload
 }
 
-export async function getSpecializations() {
-	return request('/specializations')
+export async function getSpecializations({ includeFees = false } = {}) {
+	const params = new URLSearchParams()
+	if (includeFees) params.set('include_fees', 'true')
+	const query = params.toString()
+	return request(`/specializations${query ? `?${query}` : ''}`)
 }
 
 export async function getHospitals() {
 	return request('/hospitals')
 }
 
-export async function searchDoctors({ specialty, name, hospital, date } = {}) {
+export async function getMyHospitals({ token }) {
+	return request('/doctors/me/hospitals', {
+		headers: authHeaders(token),
+	})
+}
+
+export async function searchDoctors({ specializationId, specialty, name, hospital, date } = {}) {
 	const params = new URLSearchParams()
 
+	if (specializationId) params.set('specializationId', specializationId)
 	if (specialty) params.set('specialty', specialty)
 	if (name) params.set('name', name)
 	if (hospital) params.set('hospital', hospital)
@@ -177,6 +187,7 @@ export async function getDoctorById(doctorId) {
 export default {
 	getSpecializations,
 	getHospitals,
+	getMyHospitals,
 	searchDoctors,
 	getDoctorProfile,
 	updateDoctorProfile,

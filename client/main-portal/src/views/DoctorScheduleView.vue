@@ -529,7 +529,7 @@ async function loadScheduleData() {
     const [weeklyResult, overridesResult, hospitalsResult] = await Promise.allSettled([
       doctorService.getWeeklySchedule({ doctorId: id }),
       doctorService.getScheduleOverrides({ doctorId: id }),
-      doctorService.getHospitals(),
+      doctorService.getMyHospitals({ token: auth.token }),
     ])
 
     if (hospitalsResult.status === 'fulfilled') {

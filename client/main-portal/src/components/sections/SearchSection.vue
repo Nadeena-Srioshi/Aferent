@@ -21,12 +21,12 @@
               </div>
               <select
                 id="specialty-select"
-                v-model="selectedSpecialty"
+                v-model="selectedSpecialtyId"
                 required
                 class="w-full pl-10 pr-4 py-3.5 bg-white border border-border rounded-xl text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors appearance-none cursor-pointer"
               >
                 <option value="">Specialization *</option>
-                <option v-for="s in specialties" :key="s" :value="s">{{ s }}</option>
+                <option v-for="s in specializationOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
             </div>
 
@@ -97,12 +97,12 @@
         <!-- Quick filters -->
         <div class="mt-4 flex flex-wrap gap-2 justify-center" role="group" aria-label="Quick specialization filters">
           <button
-            v-for="tag in quickFilters"
-            :key="tag"
+            v-for="option in quickFilters"
+            :key="option.id"
             class="px-4 py-1.5 rounded-full text-sm font-medium border border-border text-muted hover:border-primary hover:text-primary hover:bg-primary/5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            @click="applyQuickFilter(tag)"
+            @click="applyQuickFilter(option)"
           >
-            {{ tag }}
+            {{ option.name }}
           </button>
         </div>
       </div>
@@ -120,24 +120,34 @@ import { getHospitals, getSpecializations } from '../../services/doctorService'
 const route = useRoute()
 const router = useRouter()
 const doctorName = ref('')
-const selectedSpecialty = ref('')
+const selectedSpecialtyId = ref('')
 const hospital = ref('')
 const appointmentDate = ref('')
 const error = ref('')
-const specialties = ref([])
+const specializationOptions = ref([])
 const hospitals = ref([])
+const legacySpecialtyName = ref('')
 
-const quickFilters = computed(() => specialties.value.slice(0, 6))
+const quickFilters = computed(() => specializationOptions.value.slice(0, 6))
 
-const toNameList = (items, fallbackKey = 'name') => {
+const toSpecializationOptions = (items) => {
   if (!Array.isArray(items)) return []
 
   return items
     .map((item) => {
-      if (typeof item === 'string') return item
-      if (item && typeof item === 'object') {
-        return item.name ?? item[fallbackKey] ?? null
+      if (typeof item === 'string') {
+        const value = item.trim()
+        if (!value) return null
+        return { id: value, name: value }
       }
+
+      if (item && typeof item === 'object') {
+        const id = item.id ?? null
+        const name = item.name ?? null
+        if (!id || !name) return null
+        return { id: String(id), name: String(name) }
+      }
+
       return null
     })
     .filter(Boolean)
@@ -172,9 +182,33 @@ const toHospitalOptions = (items) => {
 
 const syncFromRouteQuery = () => {
   doctorName.value = typeof route.query.name === 'string' ? route.query.name.trim() : ''
-  selectedSpecialty.value = typeof route.query.specialty === 'string' ? route.query.specialty.trim() : ''
+  selectedSpecialtyId.value = typeof route.query.specializationId === 'string' ? route.query.specializationId.trim() : ''
+  legacySpecialtyName.value = !selectedSpecialtyId.value && typeof route.query.specialty === 'string'
+    ? route.query.specialty.trim()
+    : ''
   hospital.value = typeof route.query.hospital === 'string' ? route.query.hospital.trim() : ''
   appointmentDate.value = typeof route.query.date === 'string' ? route.query.date.trim() : ''
+}
+
+const normalizeSpecializationSelection = () => {
+  if (!specializationOptions.value.length) return
+
+  const exactId = specializationOptions.value.find((option) => option.id === selectedSpecialtyId.value)
+  if (exactId) {
+    legacySpecialtyName.value = ''
+    return
+  }
+
+  if (!legacySpecialtyName.value) return
+
+  const byName = specializationOptions.value.find((option) =>
+    option.name.toLowerCase() === legacySpecialtyName.value.toLowerCase()
+  )
+
+  if (byName) {
+    selectedSpecialtyId.value = byName.id
+    legacySpecialtyName.value = ''
+  }
 }
 
 const normalizeHospitalSelection = () => {
@@ -202,8 +236,9 @@ const loadReferenceData = async () => {
       getHospitals(),
     ])
 
-    specialties.value = toNameList(specializationsResponse)
+    specializationOptions.value = toSpecializationOptions(specializationsResponse)
     hospitals.value = toHospitalOptions(hospitalsResponse)
+    normalizeSpecializationSelection()
     normalizeHospitalSelection()
   } catch (e) {
     error.value = e?.message || 'Failed to load hospitals and specializations.'
@@ -211,7 +246,7 @@ const loadReferenceData = async () => {
 }
 
 const handleSearch = () => {
-  if (!selectedSpecialty.value) {
+  if (!selectedSpecialtyId.value) {
     error.value = 'Please select a specialization before searching.'
     return
   }
@@ -221,15 +256,15 @@ const handleSearch = () => {
     path: '/find-doctor',
     query: {
       name: doctorName.value || undefined,
-      specialty: selectedSpecialty.value || undefined,
+      specializationId: selectedSpecialtyId.value || undefined,
       hospital: hospital.value || undefined,
       date: appointmentDate.value || undefined,
     },
   })
 }
 
-const applyQuickFilter = (tag) => {
-  selectedSpecialty.value = tag
+const applyQuickFilter = (option) => {
+  selectedSpecialtyId.value = option.id
   handleSearch()
 }
 
@@ -242,6 +277,7 @@ watch(
   () => route.query,
   () => {
     syncFromRouteQuery()
+    normalizeSpecializationSelection()
     normalizeHospitalSelection()
   }
 )

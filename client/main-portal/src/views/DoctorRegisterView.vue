@@ -284,6 +284,50 @@
                   </p>
                 </div>
 
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">Video Fee (15 min) <span class="text-danger">*</span></label>
+                    <div class="relative">
+                      <DollarSign class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/60" />
+                      <input
+                        v-model.number="doctorProfile.consultationFeeVideo"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 3500"
+                        class="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-ink placeholder-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-colors bg-surface"
+                        :class="fieldErr.consultationFeeVideo ? 'border-danger' : 'border-border'"
+                      />
+                    </div>
+                    <p v-if="fieldErr.consultationFeeVideo" class="text-xs text-danger mt-1 flex items-center gap-1">
+                      <AlertCircle class="w-3 h-3" />{{ fieldErr.consultationFeeVideo }}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">Physical Fee (15 min) <span class="text-danger">*</span></label>
+                    <div class="relative">
+                      <DollarSign class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/60" />
+                      <input
+                        v-model.number="doctorProfile.consultationFeePhysical"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 4500"
+                        class="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-ink placeholder-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-colors bg-surface"
+                        :class="fieldErr.consultationFeePhysical ? 'border-danger' : 'border-border'"
+                      />
+                    </div>
+                    <p v-if="fieldErr.consultationFeePhysical" class="text-xs text-danger mt-1 flex items-center gap-1">
+                      <AlertCircle class="w-3 h-3" />{{ fieldErr.consultationFeePhysical }}
+                    </p>
+                  </div>
+                </div>
+
+                <p class="text-xs text-muted -mt-1">
+                  Set your charges per <strong>15-minute appointment</strong> for both consultation types.
+                </p>
+
                 <div>
                   <label class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">Years of Experience <span class="text-danger">*</span></label>
                   <div class="relative">
@@ -419,6 +463,38 @@
             </div>
           </transition>
 
+          <!-- ── Pending approval modal ── -->
+          <Teleport to="body">
+            <transition name="modal">
+              <div v-if="showPendingApprovalModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+
+                <div class="relative z-10 w-full max-w-md bg-card rounded-2xl shadow-2xl p-6">
+                  <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Info class="w-5 h-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h3 class="text-base font-semibold text-ink">Registration received</h3>
+                      <p class="text-sm text-muted mt-1 leading-relaxed">
+                        We received your information and it is now awaiting admin verification.
+                        You will receive an email notification once your account is activated.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    @click="continueAfterPendingApproval"
+                    class="mt-5 w-full py-2.5 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-action transition-colors"
+                  >
+                    Go to Home
+                  </button>
+                </div>
+              </div>
+            </transition>
+          </Teleport>
+
         </div>
       </div>
     </div>
@@ -442,6 +518,7 @@ import {
   ChevronDown,
   BadgeCheck,
   BriefcaseMedical,
+  DollarSign,
   UploadCloud,
   FileCheck,
   Info,
@@ -459,6 +536,7 @@ const showPassword = ref(false)
 const fileInput = ref(null)
 const licenseFile = ref(null)
 const dragOver = ref(false)
+const showPendingApprovalModal = ref(false)
 const MAX_LICENSE_FILE_SIZE = 10 * 1024 * 1024
 const ALLOWED_LICENSE_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 const ALLOWED_LICENSE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
@@ -481,10 +559,16 @@ const doctorProfile = reactive({
   lastName: '',
   phone: '',
   specialization: '',
+  consultationFeeVideo: '',
+  consultationFeePhysical: '',
   licenseNumber: '',
   yearsOfExperience: '',
   qualifications: '',
 })
+
+const selectedSpecialization = computed(() => (
+  specializations.value.find((s) => s.id === doctorProfile.specialization) || null
+))
 
 const steps = [
   { title: 'Account credentials', desc: 'Email and password' },
@@ -496,7 +580,7 @@ const steps = [
 onMounted(async () => {
   loadingSpecializations.value = true
   try {
-    specializations.value = await doctorService.getSpecializations()
+    specializations.value = await doctorService.getSpecializations({ includeFees: true })
   } catch {
     notify.push('Could not load specializations. Please refresh.', 'warning')
   } finally {
@@ -593,6 +677,11 @@ function removeLicenseFile() {
   }
 }
 
+async function continueAfterPendingApproval() {
+  showPendingApprovalModal.value = false
+  await router.push('/')
+}
+
 // ── STEP 1: Auth register as DOCTOR ──
 async function submitStep1() {
   clearErrors()
@@ -639,6 +728,38 @@ async function submitStep2() {
     fieldErr.yearsOfExperience = 'Years of experience is required.'; valid = false
   }
   if (!doctorProfile.qualifications.trim()) { fieldErr.qualifications = 'Qualifications are required.'; valid = false }
+
+  const videoFee = Number(doctorProfile.consultationFeeVideo)
+  const physicalFee = Number(doctorProfile.consultationFeePhysical)
+
+  if (!Number.isFinite(videoFee) || videoFee <= 0) {
+    fieldErr.consultationFeeVideo = 'Video fee for a 15-minute appointment is required.'
+    valid = false
+  }
+
+  if (!Number.isFinite(physicalFee) || physicalFee <= 0) {
+    fieldErr.consultationFeePhysical = 'Physical fee for a 15-minute appointment is required.'
+    valid = false
+  }
+
+  if (
+    selectedSpecialization.value?.maxVideoConsultationFee != null
+    && Number.isFinite(videoFee)
+    && videoFee > selectedSpecialization.value.maxVideoConsultationFee
+  ) {
+    fieldErr.consultationFeeVideo = `Video fee cannot exceed LKR ${selectedSpecialization.value.maxVideoConsultationFee} for this specialization.`
+    valid = false
+  }
+
+  if (
+    selectedSpecialization.value?.maxPhysicalConsultationFee != null
+    && Number.isFinite(physicalFee)
+    && physicalFee > selectedSpecialization.value.maxPhysicalConsultationFee
+  ) {
+    fieldErr.consultationFeePhysical = `Physical fee cannot exceed LKR ${selectedSpecialization.value.maxPhysicalConsultationFee} for this specialization.`
+    valid = false
+  }
+
   if (!valid) return
 
   loading.value = true
@@ -651,6 +772,10 @@ async function submitStep2() {
       specialization: doctorProfile.specialization,
       licenseNumber: doctorProfile.licenseNumber,
       yearsOfExperience: doctorProfile.yearsOfExperience,
+      consultationFee: {
+        video: videoFee,
+        physical: physicalFee,
+      },
       qualifications: doctorProfile.qualifications
         .split(',')
         .map((q) => q.trim())
@@ -694,8 +819,8 @@ async function submitStep3() {
       file: licenseFile.value,
     })
 
-    notify.push('Registration complete! License uploaded successfully.', 'success')
-    router.push('/login')
+    notify.push('Registration submitted successfully.', 'success')
+    showPendingApprovalModal.value = true
   } catch (e) {
     globalError.value = e?.message || 'Could not upload your license. Please try again.'
   } finally {
@@ -716,5 +841,24 @@ async function submitStep3() {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateX(-16px);
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-active .relative,
+.modal-leave-active .relative {
+  transition: transform 0.2s ease;
+}
+.modal-enter-from .relative {
+  transform: translateY(10px) scale(0.98);
+}
+.modal-leave-to .relative {
+  transform: translateY(6px) scale(0.98);
 }
 </style>

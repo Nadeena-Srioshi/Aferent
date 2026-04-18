@@ -12,6 +12,8 @@ const showModal = ref(false)
 const modalMode = ref<'add' | 'edit'>('add')
 const editingId = ref<string | null>(null)
 const formName = ref('')
+const formMaxVideoFee = ref<number | null>(null)
+const formMaxPhysicalFee = ref<number | null>(null)
 const formError = ref('')
 const formSubmitting = ref(false)
 
@@ -25,7 +27,7 @@ async function fetchSpecializations() {
   loading.value = true
   error.value = ''
   try {
-    const res = await referenceApi.getAllSpecializations()
+    const res = await referenceApi.getAllSpecializations(true)
     specializations.value = res.data
   } catch {
     error.value = 'Failed to load specializations.'
@@ -51,6 +53,8 @@ function openAddModal() {
   modalMode.value = 'add'
   editingId.value = null
   formName.value = ''
+  formMaxVideoFee.value = null
+  formMaxPhysicalFee.value = null
   formError.value = ''
   showModal.value = true
 }
@@ -59,6 +63,8 @@ function openEditModal(specialization: Specialization) {
   modalMode.value = 'edit'
   editingId.value = specialization.id
   formName.value = specialization.name
+  formMaxVideoFee.value = specialization.maxVideoConsultationFee ?? null
+  formMaxPhysicalFee.value = specialization.maxPhysicalConsultationFee ?? null
   formError.value = ''
   showModal.value = true
 }
@@ -66,6 +72,8 @@ function openEditModal(specialization: Specialization) {
 function closeModal() {
   showModal.value = false
   formName.value = ''
+  formMaxVideoFee.value = null
+  formMaxPhysicalFee.value = null
   formError.value = ''
   editingId.value = null
 }
@@ -77,12 +85,29 @@ async function submitForm() {
     formError.value = 'Name is required'
     return
   }
+
+  if (formMaxVideoFee.value === null || Number.isNaN(formMaxVideoFee.value) || formMaxVideoFee.value < 0) {
+    formError.value = 'Max video consultation fee is required and must be 0 or greater.'
+    return
+  }
+
+  if (formMaxPhysicalFee.value === null || Number.isNaN(formMaxPhysicalFee.value) || formMaxPhysicalFee.value < 0) {
+    formError.value = 'Max physical consultation fee is required and must be 0 or greater.'
+    return
+  }
+
   formSubmitting.value = true
   try {
+    const payload = {
+      name,
+      maxVideoConsultationFee: Number(formMaxVideoFee.value),
+      maxPhysicalConsultationFee: Number(formMaxPhysicalFee.value),
+    }
+
     if (modalMode.value === 'add') {
-      await referenceApi.addSpecialization({ name })
+      await referenceApi.addSpecialization(payload)
     } else if (editingId.value) {
-      await referenceApi.updateSpecialization(editingId.value, { name })
+      await referenceApi.updateSpecialization(editingId.value, payload)
     }
     await fetchSpecializations()
     closeModal()
@@ -120,6 +145,11 @@ async function confirmDelete() {
 function formatDate(d: string) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatFee(fee?: number) {
+  if (fee == null) return '—'
+  return `LKR ${fee.toLocaleString()}`
 }
 </script>
 
@@ -183,13 +213,15 @@ function formatDate(d: string) {
           <thead>
             <tr>
               <th>Specialization Name</th>
+              <th>Max Video Fee (15 min)</th>
+              <th>Max Physical Fee (15 min)</th>
               <th>Created Date</th>
               <th class="th-action">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="filtered.length === 0">
-              <td colspan="3" class="empty-cell">
+              <td colspan="5" class="empty-cell">
                 <div class="empty-state">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                     <path d="M16 4L19 13H28L21 19L23 28L16 22L9 28L11 19L4 13H13L16 4Z" stroke="#d0d5dd" stroke-width="1.5" stroke-linejoin="round"/>
@@ -200,6 +232,8 @@ function formatDate(d: string) {
             </tr>
             <tr v-for="spec in filtered" :key="spec.id" class="data-row">
               <td class="td-name">{{ spec.name }}</td>
+              <td class="td-fee">{{ formatFee(spec.maxVideoConsultationFee) }}</td>
+              <td class="td-fee">{{ formatFee(spec.maxPhysicalConsultationFee) }}</td>
               <td class="td-date">{{ spec.createdAt ? formatDate(spec.createdAt) : '—' }}</td>
               <td class="td-action">
                 <button @click="openEditModal(spec)" class="action-btn edit-btn">Edit</button>
@@ -227,6 +261,14 @@ function formatDate(d: string) {
           <div class="form-group">
             <label>Specialization Name</label>
             <input v-model="formName" type="text" placeholder="Enter specialization name" @keyup.enter="submitForm" />
+          </div>
+          <div class="form-group">
+            <label>Max Video Consultation Fee (15 min)</label>
+            <input v-model.number="formMaxVideoFee" type="number" min="0" step="0.01" placeholder="e.g. 3500" />
+          </div>
+          <div class="form-group">
+            <label>Max Physical Consultation Fee (15 min)</label>
+            <input v-model.number="formMaxPhysicalFee" type="number" min="0" step="0.01" placeholder="e.g. 4500" />
           </div>
         </div>
         <div class="modal-footer">
@@ -464,6 +506,10 @@ td {
 .td-date {
   color: #8a94a6;
   white-space: nowrap;
+}
+.td-fee {
+  white-space: nowrap;
+  color: #3d4a5c;
 }
 .td-action {
   width: 140px;

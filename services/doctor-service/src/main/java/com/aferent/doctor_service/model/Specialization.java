@@ -15,5 +15,7 @@ public class Specialization {
     private String id;
 
     private String name;   // "Cardiology", "Neurology", "Other"
+    private Double maxVideoConsultationFee;      // max fee for 15-min video consultation
+    private Double maxPhysicalConsultationFee;   // max fee for 15-min physical consultation
     private boolean active;
 }

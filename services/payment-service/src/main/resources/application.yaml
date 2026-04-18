@@ -7,8 +7,7 @@ spring:
 
   # MongoDB — uses aferent.payment_service database
   mongodb:
-    #uri: ${MONGO_URI:mongodb://localhost:27017/aferent.payment_service}
-    uri: mongodb+srv://srioshi_db_user:28k3T9FAK9d9FIIP@cluster0.6vsdh2n.mongodb.net/payment_db?appName=Cluster0
+    uri: ${MONGO_URI}
 
   # Kafka
   kafka:
