@@ -297,47 +297,23 @@ public class DoctorScheduleService {
     }
 
     private void publishWeeklyUpsertEvents(WeeklySchedule schedule) {
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "MONDAY", schedule.getMonday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "TUESDAY", schedule.getTuesday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "WEDNESDAY", schedule.getWednesday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "THURSDAY", schedule.getThursday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "FRIDAY", schedule.getFriday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "SATURDAY", schedule.getSaturday());
-        publishWeeklyDayUpsert(schedule.getDoctorId(), "SUNDAY", schedule.getSunday());
+        // Emit a single trigger event per weekly update.
+        // appointment-service fetches full schedule by doctorId and regenerates slots.
+        doctorEventProducer.publishWeeklyUpserted(
+                schedule.getDoctorId(),
+                schedule.getId(),
+                null,
+                null,
+                null,
+                null,
+                null
+        );
     }
 
     private void publishWeeklyDeleteEvents(WeeklySchedule schedule) {
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getMonday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getTuesday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getWednesday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getThursday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getFriday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getSaturday());
-        publishWeeklyDayDelete(schedule.getDoctorId(), schedule.getSunday());
-    }
-
-    private void publishWeeklyDayUpsert(String doctorId, String dayOfWeek, List<DaySchedule> slots) {
-        if (slots == null || slots.isEmpty()) {
-            return;
-        }
-
-        slots.forEach(slot -> doctorEventProducer.publishWeeklyUpserted(
-                doctorId,
-                slot.getSessionId(),
-                dayOfWeek,
-                slot.getStartTime(),
-                slot.getEndTime(),
-                mapType(slot.getType()),
-                slot.getHospital()
-        ));
-    }
-
-    private void publishWeeklyDayDelete(String doctorId, List<DaySchedule> slots) {
-        if (slots == null || slots.isEmpty()) {
-            return;
-        }
-
-        slots.forEach(slot -> doctorEventProducer.publishWeeklyDeleted(doctorId, slot.getSessionId()));
+        // Emit one delete event with the weekly schedule document id.
+        // appointment-service deletes future unbooked slots by scheduleId.
+        doctorEventProducer.publishWeeklyDeleted(schedule.getDoctorId(), schedule.getId());
     }
 
     private void publishOverrideUpsertEvents(ScheduleOverride override) {
@@ -359,7 +335,8 @@ public class DoctorScheduleService {
                                 slot.getStartTime(),
                                 slot.getEndTime(),
                                 mapType(slot.getType()),
-                                slot.getHospital()
+                                slot.getHospital(),
+                                slot.getConsultationFee()
                         )
                 );
             }

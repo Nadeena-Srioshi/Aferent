@@ -8,6 +8,7 @@ import com.aferent.appointment_service.kafka.KafkaProducer;
 import com.aferent.appointment_service.model.*;
 import com.aferent.appointment_service.repository.AppointmentRepository;
 import com.aferent.appointment_service.repository.GeneratedSlotRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -129,7 +130,7 @@ public class AppointmentService {
         slotRepository.save(slot);
         
 
-        double fee = slot.getConsultationFee();
+        double fee = resolveConsultationFee(request.getDoctorId(), AppointmentType.PHYSICAL, slot.getConsultationFee());
         AppointmentStatus status = fee > 0 ? AppointmentStatus.PENDING_PAYMENT : AppointmentStatus.CONFIRMED;
 
         return Appointment.builder()
@@ -192,10 +193,43 @@ public class AppointmentService {
                 .videoSlotId(slot.getVideoSlotId())
                 .videoSlotStart(slot.getStartTime())
                 .videoSlotEnd(slot.getEndTime())
-                .consultationFee(slot.getConsultationFee())
+                .consultationFee(resolveConsultationFee(request.getDoctorId(), AppointmentType.VIDEO, slot.getConsultationFee()))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
+    }
+
+    private double resolveConsultationFee(String doctorId, AppointmentType type, double slotFee) {
+        if (slotFee > 0) {
+            return slotFee;
+        }
+
+        try {
+            JsonNode doctor = webClientBuilder.baseUrl(doctorServiceUrl).build()
+                    .get()
+                    .uri("/doctors/{doctorId}", doctorId)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+
+            if (doctor == null) {
+                return 0.0;
+            }
+
+            JsonNode consultationFee = doctor.path("consultationFee");
+            if (consultationFee.isMissingNode() || consultationFee.isNull()) {
+                return 0.0;
+            }
+
+            return switch (type) {
+                case PHYSICAL -> consultationFee.path("physical").asDouble(0.0);
+                case VIDEO -> consultationFee.path("video").asDouble(0.0);
+            };
+        } catch (Exception e) {
+            log.warn("Failed to resolve consultation fee for doctorId={} type={}: {}",
+                    doctorId, type, e.getMessage());
+            return 0.0;
+        }
     }
 
     // ─── STATUS UPDATE (called by Doctor Service proxy) ───────────────────────

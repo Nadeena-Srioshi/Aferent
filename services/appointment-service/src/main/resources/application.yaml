@@ -30,7 +30,10 @@ services:
 
 # How far ahead to generate slots (in weeks)
 appointment:
-  slot-generation-weeks-ahead: 4
+  slot-generation-weeks-ahead: 2
+  max-slots-per-session: 64
+  max-slots-per-regeneration: 600
+  max-slots-per-date: 120
   refund-cutoff-hours: 2
   
 management:
