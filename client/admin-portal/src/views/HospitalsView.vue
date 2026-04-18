@@ -203,8 +203,10 @@ function formatDate(d: string) {
               <td class="td-name">{{ hospital.name }}</td>
               <td class="td-date">{{ hospital.createdAt ? formatDate(hospital.createdAt) : '—' }}</td>
               <td class="td-action">
-                <button @click="openEditModal(hospital)" class="action-btn edit-btn">Edit</button>
-                <button @click="openDeleteModal(hospital)" class="action-btn delete-btn">Delete</button>
+                <div class="action-group">
+                  <button @click="openEditModal(hospital)" class="action-btn edit-btn">Edit</button>
+                  <button @click="openDeleteModal(hospital)" class="action-btn delete-btn">Delete</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -471,6 +473,14 @@ td {
   text-align: right;
 }
 
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+
 .action-btn {
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
@@ -480,7 +490,8 @@ td {
   padding: 5px 12px;
   cursor: pointer;
   transition: background 0.15s;
-  margin-left: 6px;
+  margin-left: 0;
+  white-space: nowrap;
 }
 .edit-btn {
   color: #4a9eff;
