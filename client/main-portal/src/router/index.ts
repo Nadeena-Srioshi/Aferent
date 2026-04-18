@@ -76,6 +76,12 @@ const router = createRouter({
       component: DoctorScheduleView,
       meta: { requiresAuth: true, roles: ['DOCTOR'] },
     },
+    {
+      path: '/video-call/:appointmentId',
+      name: 'video-call',
+      component: () => import('@/views/VideoCallView.vue'),
+      meta: { requiresAuth: true, roles: ['PATIENT', 'DOCTOR'] },
+    },
   ],
 })
 
