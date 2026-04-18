@@ -97,12 +97,11 @@
                 </select>
                 <select
                   v-model="weeklySlotDraft[day.key].hospital"
-                  :disabled="weeklySlotDraft[day.key].type !== 'IN_PERSON'"
-                  class="sm:col-span-4 px-2.5 py-2 rounded-lg border border-border text-sm bg-white disabled:opacity-60"
+                  class="sm:col-span-4 px-2.5 py-2 rounded-lg border border-border text-sm bg-white"
                 >
                   <option value="">Select hospital</option>
                   <option v-for="hospital in hospitals" :key="hospital.id" :value="hospital.id">
-                    {{ hospital.name }}<span v-if="hospital.city"> — {{ hospital.city }}</span>
+                    {{ hospital.name }}{{ hospital.city ? ` — ${hospital.city}` : '' }}
                   </option>
                 </select>
                 <button
@@ -195,10 +194,10 @@
                       <option value="VIDEO">Video</option>
                       <option value="IN_PERSON">In person</option>
                     </select>
-                    <select v-model="slot.hospital" :disabled="slot.type !== 'IN_PERSON'" class="px-2.5 py-2 rounded-lg border border-border text-sm bg-white disabled:opacity-60">
+                    <select v-model="slot.hospital" class="px-2.5 py-2 rounded-lg border border-border text-sm bg-white">
                       <option value="">Select hospital</option>
                       <option v-for="hospital in hospitals" :key="hospital.id" :value="hospital.id">
-                        {{ hospital.name }}<span v-if="hospital.city"> — {{ hospital.city }}</span>
+                        {{ hospital.name }}{{ hospital.city ? ` — ${hospital.city}` : '' }}
                       </option>
                     </select>
                   </div>
@@ -529,7 +528,7 @@ async function loadScheduleData() {
     const [weeklyResult, overridesResult, hospitalsResult] = await Promise.allSettled([
       doctorService.getWeeklySchedule({ doctorId: id }),
       doctorService.getScheduleOverrides({ doctorId: id }),
-      doctorService.getMyHospitals({ token: auth.token }),
+      doctorService.getMyHospitals({ token: auth.token, authId: auth.user?.authId }),
     ])
 
     if (hospitalsResult.status === 'fulfilled') {

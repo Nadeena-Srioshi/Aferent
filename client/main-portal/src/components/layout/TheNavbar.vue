@@ -82,7 +82,13 @@
                   class="w-8 h-8 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0 select-none"
                   aria-hidden="true"
                 >
-                  {{ initials }}
+                  <img
+                    v-if="resolvedAvatarUrl"
+                    :src="resolvedAvatarUrl"
+                    :alt="fullName"
+                    class="w-full h-full object-cover rounded-full"
+                  />
+                  <span v-else>{{ initials }}</span>
                 </div>
                 <span class="text-sm font-semibold text-ink max-w-30 truncate">{{ firstName }}</span>
                 <ChevronDown
@@ -216,7 +222,13 @@
             <!-- User info strip -->
             <div class="flex items-center gap-3 px-3 py-3 bg-surface rounded-xl mb-3">
               <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center shrink-0 select-none" aria-hidden="true">
-                {{ initials }}
+                <img
+                  v-if="resolvedAvatarUrl"
+                  :src="resolvedAvatarUrl"
+                  :alt="fullName"
+                  class="w-full h-full object-cover rounded-full"
+                />
+                <span v-else>{{ initials }}</span>
               </div>
               <div class="min-w-0">
                 <p class="text-sm font-bold text-ink truncate">{{ fullName }}</p>
@@ -255,11 +267,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuth } from '@/stores/useAuth'
 import { useNotificationStore } from '@/stores/notificationStore'
+import doctorService from '@/services/doctorService'
+import patientService from '@/services/patientService'
+import { resolveDoctorIdentity } from '@/services/doctorDashboardService'
 import {
   Bell,
   CalendarDays,
@@ -285,6 +300,8 @@ const { isAuthenticated, isDoctor, user } = storeToRefs(auth)
 const fullName  = computed(() => user.value?.name ?? auth.fullName ?? '')
 const firstName = computed(() => fullName.value.split(' ')[0] || 'Account')
 const userEmail = computed(() => user.value?.email ?? '')
+const sessionAvatarUrl = computed(() => user.value?.avatarUrl || user.value?.profilePicUrl || '')
+const resolvedAvatarUrl = ref(sessionAvatarUrl.value)
 const initials  = computed(() =>
   (fullName.value || auth.fullName || '')
     .split(' ')
@@ -300,6 +317,8 @@ const profileOpen = ref(false)
 const notifOpen   = ref(false)
 const scrolled    = ref(false)
 const profileRef  = ref(null)
+
+let avatarLoadRequestId = 0
 
 // ── Nav links ─────────────────────────────────────────────────
 const navLinks = computed(() => (
@@ -349,6 +368,46 @@ async function handleLogout() {
   router.push('/')
 }
 
+async function loadAvatar() {
+  const requestId = ++avatarLoadRequestId
+  resolvedAvatarUrl.value = sessionAvatarUrl.value || ''
+
+  if (!isAuthenticated.value || !auth.token) {
+    return
+  }
+
+  try {
+    if (isDoctor.value) {
+      const identity = await resolveDoctorIdentity({
+        token: auth.token,
+        authId: auth.user?.authId,
+        email: auth.user?.email,
+      })
+
+      if (requestId !== avatarLoadRequestId) return
+
+      if (!identity?.doctorId) return
+
+      const doctor = await doctorService.getDoctorById(identity.doctorId)
+      if (requestId !== avatarLoadRequestId) return
+
+      resolvedAvatarUrl.value = doctor?.profilePicUrl || sessionAvatarUrl.value || ''
+      return
+    }
+
+    if (auth.user?.authId) {
+      const patient = await patientService.getCurrentProfile({ token: auth.token })
+      if (requestId !== avatarLoadRequestId) return
+
+      resolvedAvatarUrl.value = patient?.avatarUrl || sessionAvatarUrl.value || ''
+    }
+  } catch {
+    if (requestId === avatarLoadRequestId) {
+      resolvedAvatarUrl.value = sessionAvatarUrl.value || ''
+    }
+  }
+}
+
 // ── Click outside to close profile dropdown ───────────────────
 function handleClickOutside(e) {
   if (profileRef.value && !profileRef.value.contains(e.target)) {
@@ -363,6 +422,15 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   document.addEventListener('mousedown', handleClickOutside)
 })
+
+watch(
+  () => [isAuthenticated.value, isDoctor.value, auth.user?.authId, auth.user?.email, auth.user?.avatarUrl, auth.user?.profilePicUrl],
+  () => {
+    void loadAvatar()
+  },
+  { immediate: true },
+)
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   document.removeEventListener('mousedown', handleClickOutside)
