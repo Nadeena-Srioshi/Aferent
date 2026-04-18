@@ -1,6 +1,7 @@
 package com.aferent.doctor_service.controller;
 
 import com.aferent.doctor_service.dto.ReferenceDataRequest;
+import com.aferent.doctor_service.dto.SpecializationResponse;
 import com.aferent.doctor_service.model.Hospital;
 import com.aferent.doctor_service.model.Specialization;
 import com.aferent.doctor_service.service.ReferenceDataService;
@@ -56,8 +57,10 @@ public class ReferenceDataController {
     // ─── specializations — public GET, admin POST/PUT/DELETE ──────────
 
     @GetMapping("/specializations")
-    public ResponseEntity<List<Specialization>> getAllSpecializations() {
-        return ResponseEntity.ok(referenceDataService.getAllSpecializations());
+    public ResponseEntity<List<SpecializationResponse>> getAllSpecializations(
+            @RequestParam(name = "include_fees", defaultValue = "false") boolean includeFees
+    ) {
+        return ResponseEntity.ok(referenceDataService.getAllSpecializations(includeFees));
     }
 
     @PostMapping("/admin/specializations")

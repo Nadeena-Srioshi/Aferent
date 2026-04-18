@@ -113,6 +113,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import { useAuth } from '@/stores/useAuth'
+import { useNotificationStore } from '@/stores/notificationStore'
 import LoginIllustration from '@/components/sections/LoginIllustration.vue'
 import { Chrome, HeartPulse } from 'lucide-vue-next'
 
@@ -122,6 +123,7 @@ const error   = ref(null)
 const router  = useRouter()
 const route   = useRoute()
 const auth    = useAuth()
+const notify  = useNotificationStore()
 
 function normalizeRole(role) {
   return typeof role === 'string' ? role.trim().toUpperCase() : ''
@@ -147,7 +149,9 @@ async function handleSubmit() {
 
     await router.push('/')
   } catch (e) {
-    error.value = e?.message || 'Login failed. Please try again.'
+    const message = e?.message || 'Login failed. Please try again.'
+    error.value = message
+    notify.push(message, 'error')
   } finally {
     loading.value = false
   }

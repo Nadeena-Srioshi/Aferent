@@ -44,7 +44,7 @@ public class Doctor {
     private String profilePicKey;
     private String profilePicUrl;  // permanent URL for public profile picture
     private List<String> hospitals;
-    private Double consultationFee;
+    private ConsultationFee consultationFee;
     private List<String> languages;
 
     private RegistrationStatus status;
@@ -54,6 +54,15 @@ public class Doctor {
         PENDING_VERIFICATION,
         ACTIVE,
         SUSPENDED
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConsultationFee {
+        private Double video;      // doctor fee for a 15-min video consultation
+        private Double physical;   // doctor fee for a 15-min physical consultation
     }
 
     @CreatedDate

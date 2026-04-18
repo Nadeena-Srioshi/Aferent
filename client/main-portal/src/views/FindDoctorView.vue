@@ -12,7 +12,7 @@
           <div class="space-y-4 text-sm">
             <div>
               <p class="text-muted mb-1">Specialization</p>
-              <p class="font-semibold text-ink">{{ search.specialty || '—' }}</p>
+              <p class="font-semibold text-ink">{{ selectedSpecializationLabel || '—' }}</p>
             </div>
             <div>
               <p class="text-muted mb-1">Doctor name</p>
@@ -28,7 +28,7 @@
             </div>
           </div>
 
-          <p v-if="!search.specialty" class="mt-4 text-sm text-warning bg-warning/10 px-4 py-3 rounded-xl">
+          <p v-if="!hasSpecializationFilter" class="mt-4 text-sm text-warning bg-warning/10 px-4 py-3 rounded-xl">
             Pick a specialization from the search box.
           </p>
         </aside>
@@ -42,7 +42,7 @@
             </p>
           </div>
 
-          <div v-if="!search.specialty" class="bg-card border border-border rounded-2xl p-8 text-center">
+          <div v-if="!hasSpecializationFilter" class="bg-card border border-border rounded-2xl p-8 text-center">
             <h2 class="text-xl font-bold text-ink mb-2">Choose a specialization to begin</h2>
             <p class="text-muted">Your homepage search requires a specialization. Once selected, matching doctors will appear here.</p>
           </div>
@@ -103,22 +103,43 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import Doctorcard from '@/components/shared/Doctorcard.vue'
 import SearchSection from '@/components/sections/SearchSection.vue'
-import { getHospitals, searchDoctors } from '@/services/doctorService'
+import { getHospitals, getSpecializations, searchDoctors } from '@/services/doctorService'
 
 const route = useRoute()
 const router = useRouter()
 const doctors = ref([])
 const hospitals = ref([])
+const specializations = ref([])
 const loading = ref(false)
 const error = ref('')
 let searchRequestId = 0
 
 const search = computed(() => ({
   name: typeof route.query.name === 'string' ? route.query.name.trim() : '',
+  specializationId: typeof route.query.specializationId === 'string' ? route.query.specializationId.trim() : '',
   specialty: typeof route.query.specialty === 'string' ? route.query.specialty.trim() : '',
   hospital: typeof route.query.hospital === 'string' ? route.query.hospital.trim() : '',
   date: typeof route.query.date === 'string' ? route.query.date.trim() : '',
 }))
+
+const hasSpecializationFilter = computed(() => Boolean(search.value.specializationId || search.value.specialty))
+
+const selectedSpecializationLabel = computed(() => {
+  if (search.value.specializationId) {
+    const byId = specializations.value.find((s) => s?.id === search.value.specializationId)
+    if (byId?.name) return byId.name
+    return search.value.specializationId
+  }
+
+  if (search.value.specialty) {
+    const byName = specializations.value.find((s) =>
+      typeof s?.name === 'string' && s.name.toLowerCase() === search.value.specialty.toLowerCase()
+    )
+    return byName?.name || search.value.specialty
+  }
+
+  return ''
+})
 
 const selectedHospitalLabel = computed(() => {
   if (!search.value.hospital) return ''
@@ -154,10 +175,22 @@ function mapDoctorToCard(doctor) {
     ? `${doctor.yearsOfExperience} years experience`
     : 'Experience not specified'
 
+  const specializationLabel = (() => {
+    if (!doctor?.specialization) return 'General'
+
+    const byId = specializations.value.find((s) => s?.id === doctor.specialization)
+    if (byId?.name) return byId.name
+
+    const byName = specializations.value.find((s) =>
+      typeof s?.name === 'string' && s.name.toLowerCase() === String(doctor.specialization).toLowerCase()
+    )
+    return byName?.name || doctor.specialization
+  })()
+
   return {
     id: doctor?.doctorId || doctor?.id,
     name: fullName || doctor?.email || 'Doctor',
-    specialty: doctor?.specialization || 'General',
+    specialty: specializationLabel,
     rating: 0,
     reviewCount: 0,
     verified: doctor?.status === 'ACTIVE',
@@ -176,8 +209,16 @@ async function loadHospitals() {
   }
 }
 
+async function loadSpecializations() {
+  try {
+    specializations.value = await getSpecializations()
+  } catch {
+    specializations.value = []
+  }
+}
+
 async function loadDoctors() {
-  if (!search.value.specialty) {
+  if (!hasSpecializationFilter.value) {
     doctors.value = []
     error.value = ''
     loading.value = false
@@ -190,6 +231,7 @@ async function loadDoctors() {
 
   try {
     const results = await searchDoctors({
+      specializationId: search.value.specializationId || undefined,
       specialty: search.value.specialty,
       name: search.value.name || undefined,
       hospital: search.value.hospital || undefined,
@@ -214,6 +256,7 @@ watch(search, () => {
 })
 
 onMounted(() => {
+  loadSpecializations()
   loadHospitals()
   loadDoctors()
 })

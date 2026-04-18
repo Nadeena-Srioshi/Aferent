@@ -400,6 +400,20 @@ function canJoinVideoCall(appointment) {
   return type === 'VIDEO' && status === 'CONFIRMED'
 }
 
+function getAppointmentFee(appointment) {
+  const fee = appointment?.consultationFee
+  if (typeof fee === 'number' && Number.isFinite(fee)) return fee
+
+  if (!fee || typeof fee !== 'object') return 0
+
+  const isVideo = String(appointment?.type || '').toUpperCase() === 'VIDEO'
+  const preferred = isVideo ? fee.video : fee.physical
+  if (typeof preferred === 'number' && Number.isFinite(preferred)) return preferred
+
+  const fallback = typeof fee.physical === 'number' ? fee.physical : fee.video
+  return Number.isFinite(fallback) ? fallback : 0
+}
+
 function joinVideoCall(appointment) {
   if (!appointment?.id) return
   router.push({ name: 'video-call', params: { appointmentId: appointment.id } })
@@ -522,7 +536,7 @@ async function confirmCancel() {
 async function startPayment(appointment) {
   if (!appointment?.id) return
 
-  const amount = Number(appointment?.consultationFee || 0)
+  const amount = Number(getAppointmentFee(appointment) || 0)
   if (!Number.isFinite(amount) || amount <= 0) {
     notify.push('This appointment has an invalid consultation fee.', 'error')
     return

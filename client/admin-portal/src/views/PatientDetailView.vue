@@ -35,7 +35,7 @@ interface Appointment {
   type: 'PHYSICAL' | 'VIDEO'
   status: string
   appointmentDate: string
-  consultationFee: number
+  consultationFee: number | { video?: number; physical?: number } | null
   hospitalName?: string
 }
 
@@ -150,6 +150,21 @@ function age(dob: string) {
   if (!dob) return null
   const diff = Date.now() - new Date(dob).getTime()
   return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
+}
+
+function appointmentFee(appt: Appointment) {
+  if (typeof appt.consultationFee === 'number' && Number.isFinite(appt.consultationFee)) {
+    return appt.consultationFee
+  }
+
+  const fee = appt.consultationFee
+  if (!fee || typeof fee !== 'object') return 0
+
+  const preferred = appt.type === 'VIDEO' ? fee.video : fee.physical
+  if (typeof preferred === 'number' && Number.isFinite(preferred)) return preferred
+
+  const fallback = typeof fee.physical === 'number' ? fee.physical : fee.video
+  return Number.isFinite(fallback) ? fallback : 0
 }
 </script>
 
@@ -321,7 +336,7 @@ function age(dob: string) {
                   class="status-badge"
                   :style="{ background: statusColor(appt.status) + '18', color: statusColor(appt.status) }"
                 >{{ statusLabel(appt.status) }}</span>
-                <p class="appt-fee">LKR {{ (appt.consultationFee ?? 0).toLocaleString() }}</p>
+                <p class="appt-fee">LKR {{ appointmentFee(appt).toLocaleString() }}</p>
               </div>
             </div>
           </div>

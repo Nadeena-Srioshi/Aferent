@@ -19,7 +19,7 @@ interface RecentAppointment {
   type: 'PHYSICAL' | 'VIDEO'
   status: string
   appointmentDate: string
-  consultationFee: number
+  consultationFee: number | { video?: number; physical?: number } | null
 }
 
 interface RecentPayment {
@@ -202,6 +202,21 @@ function statusLabel(s: string) {
 function typeLabel(t: string) {
   return t === 'VIDEO' ? 'Video' : 'In-person'
 }
+
+function appointmentFee(appt: RecentAppointment) {
+  if (typeof appt.consultationFee === 'number' && Number.isFinite(appt.consultationFee)) {
+    return appt.consultationFee
+  }
+
+  const fee = appt.consultationFee
+  if (!fee || typeof fee !== 'object') return 0
+
+  const preferred = appt.type === 'VIDEO' ? fee.video : fee.physical
+  if (typeof preferred === 'number' && Number.isFinite(preferred)) return preferred
+
+  const fallback = typeof fee.physical === 'number' ? fee.physical : fee.video
+  return Number.isFinite(fallback) ? fallback : 0
+}
 </script>
 
 <template>
@@ -319,7 +334,7 @@ function typeLabel(t: string) {
                 >
                   {{ statusLabel(appt.status) }}
                 </span>
-                <p class="appt-fee">LKR {{ (appt.consultationFee ?? 0).toLocaleString() }}</p>
+                <p class="appt-fee">LKR {{ appointmentFee(appt).toLocaleString() }}</p>
               </div>
             </div>
           </div>

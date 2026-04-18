@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import api from '@/api/axios'
+import { referenceApi, type Specialization } from '@/api/reference'
 
 // ── Types ─────────────────────────────────────────────────
 type VerificationAction = 'APPROVE' | 'REJECT'
@@ -15,10 +16,11 @@ interface Doctor {
   lastName: string
   phone: string
   specialization: string
+  licenseNumber: string
   qualifications: string[]
   hospitalAffiliations: string[]
   status: DoctorStatus
-  consultationFee: number
+  consultationFee: number | { video?: number; physical?: number } | null
   createdAt: string
   bio?: string
   gender?: string
@@ -26,6 +28,7 @@ interface Doctor {
 
 // ── State ─────────────────────────────────────────────────
 const doctors = ref<Doctor[]>([])
+const specializations = ref<Specialization[]>([])
 const loading = ref(true)
 const error = ref('')
 const search = ref('')
@@ -46,6 +49,22 @@ const rejectionReason = ref('')
 
 // ── Fetch ─────────────────────────────────────────────────
 onMounted(fetchDoctors)
+onMounted(fetchSpecializations)
+
+async function fetchSpecializations() {
+  try {
+    const res = await referenceApi.getAllSpecializations()
+    specializations.value = Array.isArray(res.data) ? res.data : []
+  } catch {
+    specializations.value = []
+  }
+}
+
+function specializationLabel(value: string) {
+  if (!value) return '—'
+  const match = specializations.value.find((s) => s.id === value)
+  return match?.name || value
+}
 
 async function fetchDoctors() {
   loading.value = true
@@ -91,7 +110,8 @@ const filtered = computed(() => {
     list = list.filter(d =>
       `${d.firstName} ${d.lastName}`.toLowerCase().includes(q) ||
       d.email?.toLowerCase().includes(q) ||
-      d.specialization?.toLowerCase().includes(q) ||
+      specializationLabel(d.specialization).toLowerCase().includes(q) ||
+      d.licenseNumber?.toLowerCase().includes(q) ||
       d.doctorId?.toLowerCase().includes(q)
     )
   }
@@ -106,8 +126,8 @@ const filtered = computed(() => {
       av = `${a.firstName} ${a.lastName}`
       bv = `${b.firstName} ${b.lastName}`
     } else if (sortKey.value === 'specialization') {
-      av = a.specialization ?? ''
-      bv = b.specialization ?? ''
+      av = specializationLabel(a.specialization)
+      bv = specializationLabel(b.specialization)
     } else {
       av = a.createdAt ?? ''
       bv = b.createdAt ?? ''
@@ -210,6 +230,7 @@ function normalizeDoctor(raw: any): Doctor {
     lastName: raw.lastName ?? '',
     phone: raw.phone ?? '',
     specialization: raw.specialization ?? '',
+    licenseNumber: raw.licenseNumber ?? '',
     qualifications: Array.isArray(raw.qualifications) ? raw.qualifications : [],
     hospitalAffiliations: Array.isArray(raw.hospitalAffiliations)
       ? raw.hospitalAffiliations
@@ -217,7 +238,7 @@ function normalizeDoctor(raw: any): Doctor {
         ? raw.hospitals
         : [],
     status: mappedStatus,
-    consultationFee: Number(raw.consultationFee ?? 0),
+    consultationFee: raw.consultationFee ?? null,
     createdAt: raw.createdAt ?? '',
     bio: raw.bio,
     gender: raw.gender,
@@ -306,6 +327,25 @@ function formatFee(fee: number) {
   if (!fee) return '—'
   return 'LKR ' + fee.toLocaleString()
 }
+
+function toNumberOrNull(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+function formatDoctorFee(fee: Doctor['consultationFee']) {
+  if (typeof fee === 'number') return formatFee(fee)
+
+  const video = toNumberOrNull(fee?.video)
+  const physical = toNumberOrNull(fee?.physical)
+
+  if (!video && !physical) return '—'
+  if (video && physical) {
+    return `V: ${formatFee(video)} · P: ${formatFee(physical)}`
+  }
+
+  return video ? `V: ${formatFee(video)}` : `P: ${formatFee(physical)}`
+}
 </script>
 
 <template>
@@ -382,7 +422,7 @@ function formatFee(fee: number) {
           @input="onSearchInput"
           class="search-input"
           type="text"
-          placeholder="Search by name, email, specialization or ID…"
+          placeholder="Search by name, email, specialization, license or ID…"
         />
         <button v-if="search" class="clear-btn" @click="search = ''; onSearchInput()">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -433,6 +473,7 @@ function formatFee(fee: number) {
                   {{ sortKey === 'specialization' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
+              <th>License #</th>
               <th>Email</th>
               <th>Fee</th>
               <th class="sortable" @click="toggleSort('createdAt')">
@@ -447,7 +488,7 @@ function formatFee(fee: number) {
           </thead>
           <tbody>
             <tr v-if="paginated.length === 0">
-              <td colspan="7" class="empty-cell">
+              <td colspan="8" class="empty-cell">
                 <div class="empty-state">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                     <rect x="6" y="4" width="20" height="24" rx="3" stroke="#d0d5dd" stroke-width="1.5"/>
@@ -475,16 +516,19 @@ function formatFee(fee: number) {
               <!-- Specialization -->
               <td>
                 <span v-if="doctor.specialization" class="spec-pill">
-                  {{ doctor.specialization }}
+                  {{ specializationLabel(doctor.specialization) }}
                 </span>
                 <span v-else class="muted">—</span>
               </td>
+
+              <!-- License number -->
+              <td class="td-license">{{ doctor.licenseNumber || '—' }}</td>
 
               <!-- Email -->
               <td class="td-email">{{ doctor.email ?? '—' }}</td>
 
               <!-- Fee -->
-              <td class="td-fee">{{ formatFee(doctor.consultationFee) }}</td>
+              <td class="td-fee">{{ formatDoctorFee(doctor.consultationFee) }}</td>
 
               <!-- Registered date -->
               <td class="td-date">{{ formatDate(doctor.createdAt) }}</td>
@@ -587,7 +631,9 @@ function formatFee(fee: number) {
           <p class="modal-body">
             You are about to {{ pendingAction === 'REJECT' ? 'reject' : 'verify' }}
             <strong>Dr. {{ pendingVerifyDoctor ? fullName(pendingVerifyDoctor) : '' }}</strong>
-            ({{ pendingVerifyDoctor?.specialization ?? 'Unknown specialty' }}).
+            ({{ pendingVerifyDoctor ? specializationLabel(pendingVerifyDoctor.specialization) : 'Unknown specialty' }}).
+            <br/>
+            License No: <strong>{{ pendingVerifyDoctor?.licenseNumber || '—' }}</strong>
             <br/><br/>
             {{ pendingAction === 'REJECT'
               ? 'They will not be allowed to use the platform until re-approved by an admin.'
@@ -909,6 +955,7 @@ td { padding: 13px 16px; color: #3d4a5c; vertical-align: middle; }
 }
 
 .td-email { color: #4a9eff; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-license { white-space: nowrap; color: #5a6578; }
 .td-fee { font-weight: 500; color: #0f2744; white-space: nowrap; }
 .td-date { white-space: nowrap; color: #8a94a6; }
 .td-action { width: 120px; }

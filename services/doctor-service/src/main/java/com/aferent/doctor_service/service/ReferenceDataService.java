@@ -1,6 +1,7 @@
 package com.aferent.doctor_service.service;
 
 import com.aferent.doctor_service.dto.ReferenceDataRequest;
+import com.aferent.doctor_service.dto.SpecializationResponse;
 import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Hospital;
 import com.aferent.doctor_service.model.Specialization;
@@ -56,13 +57,23 @@ public class ReferenceDataService {
 
     // ─── specializations ─────────────────────────────────────────────
 
-    public List<Specialization> getAllSpecializations() {
-        return specializationRepository.findByActiveTrue();
+    public List<SpecializationResponse> getAllSpecializations(boolean includeFees) {
+        return specializationRepository.findByActiveTrue()
+                .stream()
+                .map(spec -> SpecializationResponse.builder()
+                        .id(spec.getId())
+                        .name(spec.getName())
+                        .maxVideoConsultationFee(includeFees ? spec.getMaxVideoConsultationFee() : null)
+                        .maxPhysicalConsultationFee(includeFees ? spec.getMaxPhysicalConsultationFee() : null)
+                        .build())
+                .toList();
     }
 
     public Specialization addSpecialization(ReferenceDataRequest request) {
         Specialization spec = Specialization.builder()
                 .name(request.getName())
+                .maxVideoConsultationFee(request.getMaxVideoConsultationFee())
+                .maxPhysicalConsultationFee(request.getMaxPhysicalConsultationFee())
                 .active(true)
                 .build();
         Specialization saved = specializationRepository.save(spec);
@@ -75,6 +86,8 @@ public class ReferenceDataService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Specialization not found: " + id));
         spec.setName(request.getName());
+        spec.setMaxVideoConsultationFee(request.getMaxVideoConsultationFee());
+        spec.setMaxPhysicalConsultationFee(request.getMaxPhysicalConsultationFee());
         spec.setActive(request.isActive());
         return specializationRepository.save(spec);
     }

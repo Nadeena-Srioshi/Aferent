@@ -4,6 +4,7 @@ import com.aferent.doctor_service.dto.RegisterProfileRequest;
 import com.aferent.doctor_service.exception.ForbiddenOperationException;
 import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Doctor;
+import com.aferent.doctor_service.model.Specialization;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import com.aferent.doctor_service.repository.SpecializationRepository;
 import lombok.RequiredArgsConstructor;
@@ -52,10 +53,25 @@ public class DoctorRegistrationService {
                     "License number already registered: " + request.getLicenseNumber());
         }
 
-        // validate specialization ID exists in master collection
-        if (!specializationRepository.existsById(request.getSpecialization())) {
+        Specialization specialization = specializationRepository.findById(request.getSpecialization())
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Invalid specialization. Select from the specializations list."));
+
+        Double videoFee = request.getConsultationFee().getVideo();
+        Double physicalFee = request.getConsultationFee().getPhysical();
+
+        if (specialization.getMaxVideoConsultationFee() != null
+            && videoFee > specialization.getMaxVideoConsultationFee()) {
             throw new IllegalArgumentException(
-                    "Invalid specialization. Select from the specializations list.");
+                "Video consultation fee for 15-min appointment exceeds specialization maximum of "
+                    + specialization.getMaxVideoConsultationFee());
+        }
+
+        if (specialization.getMaxPhysicalConsultationFee() != null
+            && physicalFee > specialization.getMaxPhysicalConsultationFee()) {
+            throw new IllegalArgumentException(
+                "Physical consultation fee for 15-min appointment exceeds specialization maximum of "
+                    + specialization.getMaxPhysicalConsultationFee());
         }
 
         doctor.setFirstName(request.getFirstName());
@@ -65,6 +81,10 @@ public class DoctorRegistrationService {
         doctor.setLicenseNumber(request.getLicenseNumber());
         doctor.setYearsOfExperience(request.getYearsOfExperience());
         doctor.setQualifications(request.getQualifications());
+        doctor.setConsultationFee(Doctor.ConsultationFee.builder()
+            .video(videoFee)
+            .physical(physicalFee)
+            .build());
         doctor.setStatus(Doctor.RegistrationStatus.PENDING_VERIFICATION);
 
         Doctor saved = doctorRepository.save(doctor);

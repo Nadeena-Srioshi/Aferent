@@ -13,7 +13,7 @@ interface Appointment {
   type: 'PHYSICAL' | 'VIDEO'
   status: string
   appointmentDate: string
-  consultationFee: number
+  consultationFee: number | { video?: number; physical?: number } | null
   hospitalName?: string
   hospitalLocation?: string
   videoSlotStart?: string
@@ -95,7 +95,7 @@ const filtered = computed(() => {
     if (sortKey.value === 'date')    { av = a.appointmentDate ?? ''; bv = b.appointmentDate ?? '' }
     if (sortKey.value === 'patient') { av = a.patientName ?? '';     bv = b.patientName ?? '' }
     if (sortKey.value === 'doctor')  { av = a.doctorName ?? '';      bv = b.doctorName ?? '' }
-    if (sortKey.value === 'fee')     { av = a.consultationFee ?? 0;  bv = b.consultationFee ?? 0 }
+    if (sortKey.value === 'fee')     { av = getAppointmentFee(a);  bv = getAppointmentFee(b) }
     if (typeof av === 'number') return sortDir.value === 'asc' ? av - (bv as number) : (bv as number) - av
     return sortDir.value === 'asc'
       ? String(av).localeCompare(String(bv))
@@ -225,6 +225,21 @@ function canCancel(status: string) {
 }
 function canUpdateStatus(status: string) {
   return !['CANCELLED', 'COMPLETED', 'REJECTED'].includes(status)
+}
+
+function getFeeFromShape(fee: Appointment['consultationFee'], type?: Appointment['type']) {
+  if (typeof fee === 'number' && Number.isFinite(fee)) return fee
+  if (!fee || typeof fee !== 'object') return 0
+
+  const feeByType = type === 'VIDEO' ? fee.video : fee.physical
+  if (typeof feeByType === 'number' && Number.isFinite(feeByType)) return feeByType
+
+  const fallback = typeof fee.physical === 'number' ? fee.physical : fee.video
+  return Number.isFinite(fallback as number) ? (fallback as number) : 0
+}
+
+function getAppointmentFee(appt: Appointment) {
+  return getFeeFromShape(appt.consultationFee, appt.type)
 }
 </script>
 
@@ -447,7 +462,7 @@ function canUpdateStatus(status: string) {
 
               <!-- Fee -->
               <td class="td-fee">
-                LKR {{ (appt.consultationFee ?? 0).toLocaleString() }}
+                LKR {{ getAppointmentFee(appt).toLocaleString() }}
               </td>
 
               <!-- Actions -->
@@ -600,7 +615,7 @@ function canUpdateStatus(status: string) {
               <p class="drawer-section-title">Payment</p>
               <div class="drawer-row">
                 <span class="drawer-label">Fee</span>
-                <span class="drawer-value fee-val">LKR {{ (drawerAppt.consultationFee ?? 0).toLocaleString() }}</span>
+                <span class="drawer-value fee-val">LKR {{ getAppointmentFee(drawerAppt) .toLocaleString() }}</span>
               </div>
               <div v-if="drawerAppt.paymentId" class="drawer-row">
                 <span class="drawer-label">Payment ID</span>

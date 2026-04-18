@@ -6,10 +6,12 @@ import com.aferent.doctor_service.exception.ResourceNotFoundException;
 import com.aferent.doctor_service.model.Doctor;
 import com.aferent.doctor_service.model.Hospital;
 import com.aferent.doctor_service.model.ScheduleOverride;
+import com.aferent.doctor_service.model.Specialization;
 import com.aferent.doctor_service.model.WeeklySchedule;
 import com.aferent.doctor_service.repository.DoctorRepository;
 import com.aferent.doctor_service.repository.HospitalRepository;
 import com.aferent.doctor_service.repository.ScheduleOverrideRepository;
+import com.aferent.doctor_service.repository.SpecializationRepository;
 import com.aferent.doctor_service.repository.WeeklyScheduleRepository;
 import com.aferent.doctor_service.service.DocumentServiceGateway;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +34,7 @@ public class DoctorProfileService {
 
     private final DoctorRepository doctorRepository;
     private final HospitalRepository hospitalRepository;
+    private final SpecializationRepository specializationRepository;
     private final WeeklyScheduleRepository weeklyScheduleRepository;
     private final ScheduleOverrideRepository scheduleOverrideRepository;
     private final DocumentServiceGateway documentServiceGateway;
@@ -39,21 +43,21 @@ public class DoctorProfileService {
         return doctorRepository.findByStatus(Doctor.RegistrationStatus.ACTIVE);
     }
 
-    public List<Doctor> searchActiveDoctors(String specialty, String name, String hospital, String date) {
+    public List<Doctor> searchActiveDoctors(String specializationId, String specialty, String name, String hospital, String date) {
+        String normalizedSpecializationId = normalize(specializationId);
         String normalizedSpecialty = normalize(specialty);
         String normalizedName = normalize(name);
         String normalizedHospital = normalize(hospital);
 
-        if (normalizedSpecialty == null) {
-            throw new IllegalArgumentException("specialty query parameter is required");
-        }
+        Set<String> specializationIds = resolveSpecializationIds(normalizedSpecializationId, normalizedSpecialty);
 
         LocalDate requestedDate = parseOptionalDate(date);
         Set<String> hospitalIds = resolveHospitalIds(normalizedHospital);
 
         return doctorRepository.findByStatus(Doctor.RegistrationStatus.ACTIVE)
                 .stream()
-                .filter(doctor -> containsIgnoreCase(doctor.getSpecialization(), normalizedSpecialty))
+            .filter(doctor -> specializationIds == null
+                || (doctor.getSpecialization() != null && specializationIds.contains(doctor.getSpecialization())))
                 .filter(doctor -> {
                     if (normalizedName == null) return true;
                     String fullName = ((doctor.getFirstName() == null ? "" : doctor.getFirstName()) + " "
@@ -76,10 +80,62 @@ public class DoctorProfileService {
                 .toList();
     }
 
+    private Set<String> resolveSpecializationIds(String specializationId, String specialtyName) {
+        if (specializationId != null) {
+            return Set.of(specializationId);
+        }
+
+        if (specialtyName == null) {
+            return null;
+        }
+
+        Set<String> resolved = specializationRepository.findByActiveTrue()
+                .stream()
+                .filter(spec -> containsIgnoreCase(spec.getName(), specialtyName))
+                .map(Specialization::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+
+        return resolved.isEmpty() ? Set.of("__NO_MATCH__") : resolved;
+    }
+
     public Doctor getProfile(String doctorId) {
         return doctorRepository.findByDoctorId(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Doctor not found: " + doctorId));
+    }
+
+    public List<Hospital> getMyHospitals(String authId) {
+        Doctor doctor = doctorRepository.findByAuthId(authId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found for authId=" + authId));
+
+        List<String> assignedHospitalIds = doctor.getHospitals();
+        if (assignedHospitalIds == null || assignedHospitalIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> dedupedIds = new LinkedHashSet<>();
+        for (String hospitalId : assignedHospitalIds) {
+            if (hospitalId != null && !hospitalId.isBlank()) {
+                dedupedIds.add(hospitalId);
+            }
+        }
+
+        if (dedupedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Hospital> activeHospitalsById = hospitalRepository.findAllById(dedupedIds)
+                .stream()
+                .filter(Hospital::isActive)
+                .filter(hospital -> hospital.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(Hospital::getId, hospital -> hospital));
+
+        return dedupedIds.stream()
+                .map(activeHospitalsById::get)
+                .filter(java.util.Objects::nonNull)
+                .toList();
     }
 
     public Doctor updateProfile(String doctorId, String authId,
