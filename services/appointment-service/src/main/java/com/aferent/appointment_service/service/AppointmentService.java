@@ -129,7 +129,7 @@ public class AppointmentService {
         slotRepository.save(slot);
         
 
-        double fee = slot.getConsultationFee() != null ? slot.getConsultationFee() : 0.0;
+        double fee = slot.getConsultationFee();
         AppointmentStatus status = fee > 0 ? AppointmentStatus.PENDING_PAYMENT : AppointmentStatus.CONFIRMED;
 
         return Appointment.builder()
