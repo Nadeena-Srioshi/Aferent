@@ -138,11 +138,32 @@ public class DoctorEventProducer {
         payload.put("eventType", "WEEKLY_UPSERT");
         payload.put("id", scheduleId);
         payload.put("doctorId", doctorId);
-        payload.put("dayOfWeek", dayOfWeek);
-        payload.put("startTime", startTime);
-        payload.put("endTime", endTime);
-        payload.put("type", type);
-        payload.put("hospitalName", hospital);
+
+        // For full-refresh trigger events, schedule detail fields may be absent.
+        // Only include optional fields when we actually have values.
+        if (dayOfWeek != null && !dayOfWeek.isBlank()) {
+            payload.put("dayOfWeek", dayOfWeek);
+        }
+        if (startTime != null && !startTime.isBlank()) {
+            payload.put("startTime", startTime);
+        }
+        if (endTime != null && !endTime.isBlank()) {
+            payload.put("endTime", endTime);
+        }
+        if (type != null && !type.isBlank()) {
+            payload.put("type", type);
+        }
+        if (hospital != null && !hospital.isBlank()) {
+            payload.put("hospitalName", hospital);
+        }
+
+        if (!payload.containsKey("dayOfWeek")
+                && !payload.containsKey("startTime")
+                && !payload.containsKey("endTime")
+                && !payload.containsKey("type")) {
+            payload.put("mode", "FULL_REFRESH_TRIGGER");
+        }
+
         payload.put("active", true);
         safeSend(WEEKLY_UPSERTED_TOPIC, doctorId, payload);
     }
@@ -171,7 +192,8 @@ public class DoctorEventProducer {
                                            String startTime,
                                            String endTime,
                                            String type,
-                                           String hospital) {
+                                           String hospital,
+                                           Double consultationFee) {
         Map<String, Object> payload = basePayload(doctorId);
         payload.put("eventType", "OVERRIDE_UPSERT");
         payload.put("overrideAction", "ADD");
@@ -183,6 +205,7 @@ public class DoctorEventProducer {
         payload.put("endTime", endTime);
         payload.put("type", type);
         payload.put("hospitalName", hospital);
+        payload.put("consultationFee", consultationFee != null ? consultationFee : 0.0);
         payload.put("active", true);
         safeSend(OVERRIDE_UPSERTED_TOPIC, doctorId, payload);
     }

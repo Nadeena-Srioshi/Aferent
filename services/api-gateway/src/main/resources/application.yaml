@@ -105,6 +105,7 @@ app:
     - /doctors/register/profile
     - /doctors/register/license-upload-url
     - /doctors/register/license-confirm
+    - /doctors/**
     - /hospitals/**
     - /specializations/**
     - /appointments/slots/doctor/**

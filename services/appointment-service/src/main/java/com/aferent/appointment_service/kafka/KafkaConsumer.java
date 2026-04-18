@@ -32,10 +32,8 @@ public class KafkaConsumer {
     private String doctorServiceUrl;
 
     /**
-     * Doctor-service publishes one event per session when a weekly schedule is saved/updated.
+     * Doctor-service publishes a weekly upsert trigger event when weekly schedule is saved/updated.
      * We fetch the full schedule via HTTP and regenerate all slots.
-     * Multiple events for the same doctorId are idempotent: each call deletes
-     * existing unbooked slots and regenerates from the current schedule state.
      */
     @KafkaListener(topics = "doctor.schedule.weekly.upserted", groupId = "appointment-service")
     public void onWeeklyScheduleUpserted(String message) {
@@ -123,7 +121,8 @@ public class KafkaConsumer {
                         return;
                     }
                     slotGenerationService.generateSlotsForOverrideSlot(
-                            slotSessionId, doctorId, date, startTime, endTime, type, hospitalName);
+                            slotSessionId, doctorId, date, startTime, endTime, type, hospitalName,
+                            node.path("consultationFee").asDouble(0.0));
                 }
                 default -> log.warn("Unknown overrideAction={} for doctorId={}", overrideAction, doctorId);
             }

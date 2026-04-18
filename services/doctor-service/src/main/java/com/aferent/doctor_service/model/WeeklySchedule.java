@@ -44,6 +44,7 @@ public class WeeklySchedule {
         private String endTime;
         private String hospital;
         private SessionType type;
+    private Double consultationFee;
 
         public enum SessionType {
             IN_PERSON, VIDEO
