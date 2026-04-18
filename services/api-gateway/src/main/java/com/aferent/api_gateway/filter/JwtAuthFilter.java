@@ -80,16 +80,9 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
         String method = exchange.getRequest().getMethod().name();
 
-        // allow GET /doctors/** without token — public profile viewing
+        // allow only GET /doctors/** without token — public reads
         // but POST/PUT/PATCH/DELETE on /doctors/** still require token
-        // only truly public GET endpoints
-        boolean isPublicGet = "GET".equals(method) && (
-                path.equals("/doctors") ||
-                path.matches("/doctors/DOC_[^/]+") ||
-                path.matches("/doctors/DOC_[^/]+/schedule/weekly") ||
-                path.matches("/doctors/DOC_[^/]+/schedule/overrides") ||
-                path.matches("/doctors/DOC_[^/]+/profile/pic-url")
-        );
+        boolean isPublicGet = "GET".equals(method) && pathMatcher.match("/doctors/**", path);
 
         if (isPublicGet) {
             return chain.filter(exchange);
