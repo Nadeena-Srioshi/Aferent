@@ -41,7 +41,7 @@ management:
 
 app:
   prescription-base-url: ${PRESCRIPTION_BASE_URL:http://localhost:8080}
-  doctor-login-url: ${DOCTOR_LOGIN_URL:http://localhost:5173/login}
+  doctor-login-url: ${DOCTOR_LOGIN_URL:http://localhost:3000/login}
 
 document-service:
   base-url: ${DOCUMENT_SERVICE_URL:http://localhost:3009}
